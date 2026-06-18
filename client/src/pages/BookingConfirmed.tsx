@@ -1,0 +1,61 @@
+import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { getMyBookings } from '../lib/api';
+import { Booking } from '../types';
+import { formatDateTime, formatPrice } from '../lib/utils';
+
+export function BookingConfirmed() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+
+  const { data: bookings = [] } = useQuery<Booking[]>({
+    queryKey: ['my-bookings'],
+    queryFn: getMyBookings,
+  });
+
+  const booking = bookings.find(b => b.id === id);
+
+  return (
+    <div className="max-w-lg mx-auto px-4 pt-12 text-center">
+      <div className="w-16 h-16 bg-[#e8f5ee] rounded-full flex items-center justify-center mx-auto mb-5">
+        <span className="text-3xl">✓</span>
+      </div>
+
+      <h1 className="text-2xl font-bold text-[#191c19]">Booking Confirmed!</h1>
+      <p className="text-sm text-[#404942] mt-2">A confirmation email has been sent to you.</p>
+
+      {booking && (
+        <div className="mt-8 bg-white rounded-2xl border border-[#e6e9e4] text-left divide-y divide-[#f0f0f0]">
+          <Row label="Court" value={booking.court.name} />
+          <Row label="Date & Time" value={formatDateTime(booking.slotStarts[0])} />
+          <Row label="Amount Paid" value={formatPrice(booking.amountCharged)} />
+          <Row label="Booking ID" value={booking.id.slice(0, 8).toUpperCase()} />
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3 mt-8">
+        <button
+          onClick={() => navigate('/my-bookings')}
+          className="w-full bg-[#1b5e3b] text-white font-semibold py-3 rounded-[10px] hover:bg-[#004527] transition-colors"
+        >
+          View My Bookings
+        </button>
+        <button
+          onClick={() => navigate('/')}
+          className="w-full text-[#1b5e3b] font-medium py-3 rounded-[10px] border border-[#1b5e3b] hover:bg-[#e8f5ee] transition-colors"
+        >
+          Book Another Court
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3.5">
+      <span className="text-sm text-[#404942]">{label}</span>
+      <span className="text-sm font-medium text-[#191c19]">{value}</span>
+    </div>
+  );
+}

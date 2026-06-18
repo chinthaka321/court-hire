@@ -1,0 +1,28 @@
+# .NET
+server/bin/
+server/obj/
+server/*.user
+server/appsettings.*.json
+!server/appsettings.json
+!server/appsettings.Development.json.example
+
+# Node / React
+client/node_modules/
+client/dist/
+client/.env.local
+client/.env*.local
+
+# Secrets (never commit)
+*.env
+.env*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vs/
+.vscode/
+*.suo
+*.user
