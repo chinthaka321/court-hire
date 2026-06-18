@@ -1,4 +1,11 @@
-# .NET
+# ── Claude Code / skills tooling ─────────────────────────────────────────────
+.claude/
+.agents/
+.mcp.json
+skills-lock.json
+.scratch/
+
+# ── .NET ──────────────────────────────────────────────────────────────────────
 server/bin/
 server/obj/
 server/*.user
@@ -6,22 +13,22 @@ server/appsettings.*.json
 !server/appsettings.json
 !server/appsettings.Development.json.example
 
-# Node / React
+# ── Node / React ──────────────────────────────────────────────────────────────
 client/node_modules/
 client/dist/
 client/.env.local
 client/.env*.local
 
-# Secrets (never commit)
+# ── Secrets (never commit) ────────────────────────────────────────────────────
 *.env
 .env*
 !.env.example
 
-# OS
+# ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# IDE
+# ── IDE ───────────────────────────────────────────────────────────────────────
 .vs/
 .vscode/
 *.suo

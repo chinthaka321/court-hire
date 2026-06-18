@@ -1,6 +1,0 @@
-@TennisBooking_HostAddress = http://localhost:5155
-
-GET {{TennisBooking_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
