@@ -1,0 +1,26 @@
+{
+  "ConnectionStrings": {
+    "Default": "Host=localhost;Port=5432;Database=tennis_booking;Username=postgres;Password=YOUR_PASSWORD"
+  },
+  "Clerk": {
+    "Authority": "https://YOUR_CLERK_INSTANCE.clerk.accounts.dev"
+  },
+  "Stripe": {
+    "SecretKey": "sk_test_REPLACE_ME",
+    "WebhookSecret": "whsec_REPLACE_ME"
+  },
+  "App": {
+    "ClientUrl": "http://localhost:5173"
+  },
+  "Booking": {
+    "HoldTtlMinutes": 7,
+    "CancellationWindowHours": 24,
+    "BookingHorizonDays": 14
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}
