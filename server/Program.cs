@@ -22,6 +22,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opt =>
     {
         opt.Authority = builder.Configuration["Clerk:Authority"];
+        opt.MapInboundClaims = false; // keep claim names as-is from the JWT (e.g. "role" stays "role")
         opt.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateAudience = false,
@@ -30,7 +31,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization(opt =>
-    opt.AddPolicy("AdminOnly", p => p.RequireClaim("metadata_role", "admin")));
+    opt.AddPolicy("AdminOnly", p => p.RequireClaim("role", "admin")));
 
 // Hangfire
 builder.Services.AddHangfire(cfg => cfg
@@ -141,3 +142,5 @@ RecurringJob.AddOrUpdate<SendReminderEmailsJob>(
 
 app.MapControllers();
 app.Run();
+
+public partial class Program { }

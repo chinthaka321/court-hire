@@ -6,8 +6,8 @@ skills-lock.json
 .scratch/
 
 # ── .NET ──────────────────────────────────────────────────────────────────────
-server/bin/
-server/obj/
+**/bin/
+**/obj/
 server/*.user
 server/appsettings.*.json
 !server/appsettings.json
