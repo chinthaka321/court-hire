@@ -1,4 +1,4 @@
-import { SlotStatus } from '../types';
+import type { SlotStatus } from '../types';
 import { cn } from '../lib/utils';
 
 const config: Record<SlotStatus, { label: string; className: string }> = {

@@ -1,9 +1,10 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect } from 'react';
 import { setAuthToken } from './lib/api';
 import { Navbar } from './components/Navbar';
 import { AdminRoute } from './components/AdminRoute';
+import { AdminLayout } from './components/AdminLayout';
 import { BookingCalendar } from './pages/BookingCalendar';
 import { BookingConfirmation } from './pages/BookingConfirmation';
 import { BookingConfirming } from './pages/BookingConfirming';
@@ -26,11 +27,13 @@ function TokenSyncer() {
   return null;
 }
 
-export default function App() {
+function AppShell() {
+  const location = useLocation();
+  const isAdmin = location.pathname.startsWith('/admin');
   return (
     <>
       <TokenSyncer />
-      <Navbar />
+      {!isAdmin && <Navbar />}
       <Routes>
         <Route path="/" element={<BookingCalendar />} />
         <Route path="/book/:courtId/:slotStart" element={<BookingConfirmation />} />
@@ -38,12 +41,18 @@ export default function App() {
         <Route path="/booking/confirmed/:id" element={<BookingConfirmed />} />
         <Route path="/my-bookings" element={<MyBookings />} />
 
-        <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-        <Route path="/admin/courts" element={<AdminRoute><AdminCourts /></AdminRoute>} />
-        <Route path="/admin/pricing" element={<AdminRoute><AdminPricing /></AdminRoute>} />
-        <Route path="/admin/blackouts" element={<AdminRoute><AdminBlackouts /></AdminRoute>} />
-        <Route path="/admin/bookings" element={<AdminRoute><AdminBookings /></AdminRoute>} />
+        <Route element={<AdminRoute><AdminLayout /></AdminRoute>}>
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/courts" element={<AdminCourts />} />
+          <Route path="/admin/pricing" element={<AdminPricing />} />
+          <Route path="/admin/blackouts" element={<AdminBlackouts />} />
+          <Route path="/admin/bookings" element={<AdminBookings />} />
+        </Route>
       </Routes>
     </>
   );
+}
+
+export default function App() {
+  return <AppShell />;
 }

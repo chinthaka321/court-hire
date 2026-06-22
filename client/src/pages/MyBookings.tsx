@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/clerk-react';
 import { getMyBookings, cancelBooking } from '../lib/api';
 import { BookingCard } from '../components/BookingCard';
-import { Booking } from '../types';
+import type { Booking } from '../types';
 
 export function MyBookings() {
   const { user, isLoaded } = useUser();
@@ -43,8 +43,11 @@ export function MyBookings() {
   );
 
   return (
-    <div className="max-w-lg mx-auto px-4 pt-6 pb-8">
-      <h1 className="text-xl font-bold text-[#191c19] mb-6">My Bookings</h1>
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 pb-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-[#191c19]">My Bookings</h1>
+        <p className="text-sm text-[#404942] mt-0.5">Your upcoming and past court reservations</p>
+      </div>
 
       {cancelError && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
@@ -53,23 +56,24 @@ export function MyBookings() {
       )}
 
       {isLoading ? (
-        <div className="text-center text-sm text-[#404942] py-12">Loading…</div>
+        <div className="text-center text-sm text-[#404942] py-16">Loading…</div>
       ) : bookings.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-[#404942] text-sm">No bookings yet.</p>
+        <div className="text-center py-20 bg-white rounded-xl border border-[#e6e9e4]">
+          <p className="text-[#191c19] font-medium">No bookings yet</p>
+          <p className="text-sm text-[#404942] mt-1">Book a court to get started</p>
           <button
             onClick={() => navigate('/')}
-            className="mt-4 text-[#1b5e3b] text-sm font-medium"
+            className="mt-5 bg-[#1b5e3b] text-white text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-[#004527] transition-colors"
           >
-            Book a court →
+            Book a Court
           </button>
         </div>
       ) : (
-        <>
+        <div className="space-y-8">
           {upcoming.length > 0 && (
-            <section className="mb-6">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#404942] mb-2">
-                Upcoming
+            <section>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#404942] mb-3">
+                Upcoming ({upcoming.length})
               </p>
               <div className="flex flex-col gap-3">
                 {upcoming.map(b => (
@@ -90,15 +94,15 @@ export function MyBookings() {
 
           {past.length > 0 && (
             <section>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#404942] mb-2">
-                Past
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#404942] mb-3">
+                Past ({past.length})
               </p>
               <div className="flex flex-col gap-3">
                 {past.map(b => <BookingCard key={b.id} booking={b} />)}
               </div>
             </section>
           )}
-        </>
+        </div>
       )}
     </div>
   );

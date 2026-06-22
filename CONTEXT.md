@@ -52,9 +52,17 @@ _Avoid_: reservation, pending booking, cart
 The time-to-live for a Hold. After it expires, the slot is released back to the availability grid. Admin-configurable.
 _Avoid_: hold expiry, timeout
 
+**Hold group**:
+A set of Hold rows sharing a `HoldGroupId` (Guid), created atomically in one transaction to reserve a multi-slot block. The frontend interacts only with the group ID. All holds in a group share the same TTL and are swept or confirmed together.
+_Avoid_: multi-hold, hold set, hold batch
+
 **Stale hold**:
 A Hold whose TTL has passed but has not yet been swept. The stale-hold sweeper deletes these on a schedule.
 _Avoid_: expired hold, abandoned hold
+
+**Block booking**:
+A booking that covers 2 or more consecutive slots on the same court on the same day. Created from a Hold group. `SlotStarts[]` contains every slot in the block. `AmountCharged` is the sum of the captured prices of all constituent slots.
+_Avoid_: multi-slot booking, session booking, extended booking
 
 **Booking**:
 A confirmed, paid reservation. Only exists after a `payment_succeeded` Stripe webhook. Stores `amount_charged` immutably.
@@ -74,8 +82,12 @@ _Avoid_: refund window, cancellation period
 A 2×2 grid of prices per court: `(day_type, band) → price`. Admin edits this directly; there is no rule engine.
 _Avoid_: pricing rules, price list, tariff
 
+**Preview price**:
+The price shown to a user on the booking confirmation screen, taken from the availability grid at the time the slot was tapped. Not authoritative — may differ from the captured price if an admin changes the rate table before the user clicks Pay.
+_Avoid_: displayed price, estimated price
+
 **Captured price**:
-The price written onto a Hold at creation time, taken from the live rate table. This is the amount charged to Stripe and stored immutably on the Booking.
+The price written onto a Hold at creation time, taken from the live rate table. This is the amount charged to Stripe and stored immutably on the Booking. The authoritative price — not the preview price.
 _Avoid_: price, slot price, checkout price
 
 ### People

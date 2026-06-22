@@ -14,8 +14,11 @@ public class CourtsController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> List()
     {
         var courts = await db.Courts
+            .AsNoTracking()
             .Where(c => c.Active)
-            .Select(c => new { c.Id, c.Name, c.SlotLengthMinutes, c.OpeningHours, c.DayNightBoundary })
+            .Select(c => new {
+                c.Id, c.Name, c.SlotLengthMinutes, c.OpeningHours, c.DayNightBoundary, c.Active
+            })
             .ToListAsync();
         return Ok(courts);
     }
@@ -24,8 +27,12 @@ public class CourtsController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> Get(Guid id)
     {
         var court = await db.Courts
-            .Include(c => c.PriceRates)
-            .FirstOrDefaultAsync(c => c.Id == id);
+            .AsNoTracking()
+            .Where(c => c.Id == id)
+            .Select(c => new {
+                c.Id, c.Name, c.SlotLengthMinutes, c.OpeningHours, c.DayNightBoundary, c.Active
+            })
+            .FirstOrDefaultAsync();
         return court is null ? NotFound() : Ok(court);
     }
 
@@ -43,7 +50,9 @@ public class CourtsController(AppDbContext db) : ControllerBase
         };
         db.Courts.Add(court);
         await db.SaveChangesAsync();
-        return CreatedAtAction(nameof(Get), new { id = court.Id }, court);
+        return Ok(new {
+            court.Id, court.Name, court.SlotLengthMinutes, court.OpeningHours, court.DayNightBoundary, court.Active
+        });
     }
 
     [HttpPut("{id:guid}"), Authorize(Policy = "AdminOnly")]
@@ -57,7 +66,9 @@ public class CourtsController(AppDbContext db) : ControllerBase
         court.SlotLengthMinutes = req.SlotLengthMinutes;
         court.DayNightBoundary = req.DayNightBoundary;
         await db.SaveChangesAsync();
-        return Ok(court);
+        return Ok(new {
+            court.Id, court.Name, court.SlotLengthMinutes, court.OpeningHours, court.DayNightBoundary, court.Active
+        });
     }
 
     [HttpDelete("{id:guid}"), Authorize(Policy = "AdminOnly")]

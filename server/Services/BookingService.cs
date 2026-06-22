@@ -93,12 +93,11 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
         var earliestSlot = booking.SlotStarts.Min();
         var withinWindow = isAdmin || DateTime.UtcNow <= earliestSlot.AddHours(-Settings.CancellationWindowHours);
 
+        if (!withinWindow && !isAdmin)
+            throw new InvalidOperationException("Cancellation window has passed — no refund will be issued");
+
         booking.State = BookingState.Cancelled;
         await db.SaveChangesAsync();
-
-        // Return whether refund should be issued — caller handles Stripe
-        if (!withinWindow && !isAdmin)
-            throw new InvalidOperationException("Cancellation window has passed — no refund");
     }
 
     public async Task UpdateHoldSessionAsync(Guid holdId, string sessionId)

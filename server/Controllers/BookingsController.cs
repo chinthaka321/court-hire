@@ -53,7 +53,10 @@ public class BookingsController(AppDbContext db, BookingService bookingService, 
                 ?? throw new KeyNotFoundException();
 
             await bookingService.CancelBookingAsync(id, UserId);
-            await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
+
+            if (!string.IsNullOrEmpty(booking.StripePaymentIntentId))
+                await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
+
             return NoContent();
         }
         catch (InvalidOperationException ex)

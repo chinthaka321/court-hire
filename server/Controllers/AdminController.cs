@@ -16,7 +16,7 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
     [HttpGet("courts/{courtId:guid}/pricing")]
     public async Task<IActionResult> GetPricing(Guid courtId)
     {
-        var rates = await db.PriceRates.Where(p => p.CourtId == courtId).ToListAsync();
+        var rates = await db.PriceRates.AsNoTracking().Where(p => p.CourtId == courtId).ToListAsync();
         return Ok(rates);
     }
 
@@ -46,9 +46,12 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
     [HttpGet("blackouts")]
     public async Task<IActionResult> GetBlackouts([FromQuery] Guid? courtId)
     {
-        var query = db.Blackouts.Include(b => b.Court).AsQueryable();
+        var query = db.Blackouts.AsQueryable();
         if (courtId.HasValue) query = query.Where(b => b.CourtId == courtId.Value);
-        return Ok(await query.ToListAsync());
+        var result = await query.Select(b => new {
+            b.Id, b.CourtId, b.Start, b.End, b.Reason
+        }).ToListAsync();
+        return Ok(result);
     }
 
     [HttpPost("blackouts")]
@@ -64,7 +67,7 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
         };
         db.Blackouts.Add(blackout);
         await db.SaveChangesAsync();
-        return CreatedAtAction(null, new { id = blackout.Id }, blackout);
+        return Ok(new { blackout.Id, blackout.CourtId, blackout.Start, blackout.End, blackout.Reason });
     }
 
     [HttpDelete("blackouts/{id:guid}")]
@@ -86,10 +89,7 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
-        var query = db.Bookings
-            .Include(b => b.Court)
-            .Include(b => b.User)
-            .AsQueryable();
+        var query = db.Bookings.AsQueryable();
 
         if (courtId.HasValue) query = query.Where(b => b.CourtId == courtId.Value);
         if (userId is not null) query = query.Where(b => b.UserId == userId);
@@ -105,6 +105,11 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
             .OrderByDescending(b => b.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(b => new {
+                b.Id, b.State, b.AmountCharged, b.SlotStarts, b.CreatedAt,
+                Court = new { b.Court.Id, b.Court.Name },
+                User  = new { b.User.Id, b.User.Email, b.User.Name }
+            })
             .ToListAsync();
 
         return Ok(new { total, items });
@@ -117,7 +122,10 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
         if (booking is null) return NotFound();
 
         await bookingService.CancelBookingAsync(id, booking.UserId, isAdmin: true);
-        await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
+
+        if (!string.IsNullOrEmpty(booking.StripePaymentIntentId))
+            await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
+
         return NoContent();
     }
 }

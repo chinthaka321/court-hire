@@ -47,7 +47,10 @@ builder.Services.AddScoped<StripeRefundService>();
 builder.Services.AddScoped<SweepExpiredHoldsJob>();
 builder.Services.AddScoped<SendReminderEmailsJob>();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(opt =>
+        opt.JsonSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -63,6 +66,53 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+
+    if (app.Environment.IsDevelopment() && !db.Courts.Any())
+    {
+        var court1Id = Guid.NewGuid();
+        var court2Id = Guid.NewGuid();
+
+        db.Courts.AddRange(
+            new TennisBooking.Models.Court
+            {
+                Id = court1Id,
+                Name = "Court A",
+                OpeningHours = new TennisBooking.Models.OpeningHours
+                {
+                    Open  = new TimeOnly(7, 0),
+                    Close = new TimeOnly(22, 0)
+                },
+                SlotLengthMinutes = 60,
+                DayNightBoundary = new TimeOnly(18, 0),
+                Active = true
+            },
+            new TennisBooking.Models.Court
+            {
+                Id = court2Id,
+                Name = "Court B",
+                OpeningHours = new TennisBooking.Models.OpeningHours
+                {
+                    Open  = new TimeOnly(8, 0),
+                    Close = new TimeOnly(21, 0)
+                },
+                SlotLengthMinutes = 60,
+                DayNightBoundary = new TimeOnly(17, 0),
+                Active = true
+            }
+        );
+
+        foreach (var courtId in new[] { court1Id, court2Id })
+        {
+            db.PriceRates.AddRange(
+                new TennisBooking.Models.PriceRate { Id = Guid.NewGuid(), CourtId = courtId, DayType = TennisBooking.Models.DayType.Weekday, Band = TennisBooking.Models.PriceBand.Day,   Price = 25m },
+                new TennisBooking.Models.PriceRate { Id = Guid.NewGuid(), CourtId = courtId, DayType = TennisBooking.Models.DayType.Weekday, Band = TennisBooking.Models.PriceBand.Night, Price = 35m },
+                new TennisBooking.Models.PriceRate { Id = Guid.NewGuid(), CourtId = courtId, DayType = TennisBooking.Models.DayType.Weekend, Band = TennisBooking.Models.PriceBand.Day,   Price = 40m },
+                new TennisBooking.Models.PriceRate { Id = Guid.NewGuid(), CourtId = courtId, DayType = TennisBooking.Models.DayType.Weekend, Band = TennisBooking.Models.PriceBand.Night, Price = 50m }
+            );
+        }
+
+        db.SaveChanges();
+    }
 }
 
 if (app.Environment.IsDevelopment())

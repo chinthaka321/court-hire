@@ -28,11 +28,15 @@ public class AvailabilityService(AppDbContext db, PricingService pricing)
             .Select(h => h.SlotStart)
             .ToListAsync();
 
-        var bookedSlots = await db.Bookings
+        var bookedSlotArrays = await db.Bookings
             .Where(bk => bk.CourtId == courtId && bk.State != BookingState.Cancelled)
-            .SelectMany(bk => bk.SlotStarts)
-            .Where(s => s >= dayStart && s < dayEnd)
+            .Select(bk => bk.SlotStarts)
             .ToListAsync();
+
+        var bookedSlots = bookedSlotArrays
+            .SelectMany(s => s)
+            .Where(s => s >= dayStart && s < dayEnd)
+            .ToList();
 
         var blackouts = await db.Blackouts
             .Where(bl => bl.CourtId == courtId && bl.Start < dayEnd && bl.End > dayStart)
