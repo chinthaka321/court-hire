@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { pollBookingByHold } from '../lib/api';
+import { pollBookingByHoldGroup } from '../lib/api';
 
 export function BookingConfirming() {
   const [params] = useSearchParams();
-  const holdId = params.get('holdId');
+  const holdGroupId = params.get('holdGroupId');
   const navigate = useNavigate();
   const [attempts, setAttempts] = useState(0);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (!holdId) { setError(true); return; }
+    if (!holdGroupId) { setError(true); return; }
 
     const interval = setInterval(async () => {
       try {
-        const result = await pollBookingByHold(holdId);
+        const result = await pollBookingByHoldGroup(holdGroupId);
         if (result.status === 'confirmed') {
           clearInterval(interval);
           navigate(`/booking/confirmed/${result.bookingId}`, { replace: true });

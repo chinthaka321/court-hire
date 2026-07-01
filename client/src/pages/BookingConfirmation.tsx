@@ -14,6 +14,7 @@ export function BookingConfirmation() {
   const [error, setError] = useState<string | null>(null);
 
   const slotDate = decodeURIComponent(slotStart!);
+  const slotCount = parseInt(searchParams.get('slotCount') ?? '2');
 
   const { data: court } = useQuery<Court>({
     queryKey: ['court', courtId],
@@ -24,7 +25,7 @@ export function BookingConfirmation() {
     setLoading(true);
     setError(null);
     try {
-      const { checkoutUrl } = await createHold(courtId!, slotDate);
+      const { checkoutUrl } = await createHold(courtId!, slotDate, slotCount);
       window.location.href = checkoutUrl;
     } catch (e: any) {
       setError(e.response?.data?.error ?? 'Slot is no longer available.');
@@ -36,7 +37,8 @@ export function BookingConfirmation() {
     return <div className="p-8 text-center text-sm text-[#404942]">Loading…</div>;
   }
 
-  const slotEnd = new Date(new Date(slotDate).getTime() + court.slotLengthMinutes * 60_000).toISOString();
+  const durationMinutes = slotCount * court.slotLengthMinutes;
+  const slotEnd = new Date(new Date(slotDate).getTime() + durationMinutes * 60_000).toISOString();
 
   return (
     <div className="max-w-lg mx-auto px-4 sm:px-6 py-8">
@@ -53,7 +55,7 @@ export function BookingConfirmation() {
       <div className="bg-white rounded-xl border border-[#e6e9e4] divide-y divide-[#f0f0f0] mb-4">
         <Row label="Court"      value={court.name} />
         <Row label="Date & Time" value={formatDateTime(slotDate)} />
-        <Row label="Duration"   value={`${court.slotLengthMinutes} min`} />
+        <Row label="Duration"   value={`${durationMinutes} min`} />
         <Row label="Ends"       value={formatDateTime(slotEnd)} />
       </div>
 

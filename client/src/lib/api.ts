@@ -22,16 +22,16 @@ export const getAvailability = (courtId: string, date: string) =>
   api.get('/availability', { params: { courtId, date } }).then(r => r.data);
 
 // Holds
-export const createHold = (courtId: string, slotStart: string) =>
-  api.post('/holds', { courtId, slotStart }).then(r => r.data);
+export const createHold = (courtId: string, slotStart: string, slotCount: number = 1) =>
+  api.post('/holds', { courtId, slotStart, slotCount }).then(r => r.data);
 
 // Bookings
 export const getMyBookings = () => api.get('/bookings').then(r => r.data);
 export const cancelBooking = (id: string) => api.delete(`/bookings/${id}`);
 export const rescheduleBooking = (id: string, newSlotStart: string) =>
   api.put(`/bookings/${id}/reschedule`, { newSlotStart });
-export const pollBookingByHold = (holdId: string) =>
-  api.get(`/bookings/by-hold/${holdId}`).then(r => r.data);
+export const pollBookingByHoldGroup = (holdGroupId: string) =>
+  api.get(`/bookings/by-hold-group/${holdGroupId}`).then(r => r.data);
 
 // Admin
 export const adminGetBookings = (params?: object) =>
@@ -48,3 +48,6 @@ export const adminCreateBlackout = (data: object) =>
 export const adminDeleteBlackout = (id: string) => api.delete(`/admin/blackouts/${id}`);
 export const createCourt = (data: object) => api.post('/courts', data).then(r => r.data);
 export const updateCourt = (id: string, data: object) => api.put(`/courts/${id}`, data).then(r => r.data);
+export const adminGetCourts = () => api.get('/admin/courts').then(r => r.data);
+export const adminToggleCourt = (id: string, active: boolean) =>
+  api.patch(`/admin/courts/${id}/active`, { active });

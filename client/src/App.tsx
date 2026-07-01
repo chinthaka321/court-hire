@@ -19,7 +19,7 @@ import { AdminBookings } from './pages/admin/AdminBookings';
 function TokenSyncer() {
   const { getToken } = useAuth();
   useEffect(() => {
-    const refresh = async () => setAuthToken(await getToken({ template: 'tennis-booking' }));
+    const refresh = async () => setAuthToken(await getToken());
     refresh();
     const id = setInterval(refresh, 55_000);
     return () => clearInterval(id);

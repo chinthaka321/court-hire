@@ -5,13 +5,55 @@ import { useAuth } from '@clerk/clerk-react';
 import { getCourts, getAvailability } from '../lib/api';
 import { DatePicker } from '../components/DatePicker';
 import { SlotCell } from '../components/SlotCell';
-import type { Court, SlotInfo } from '../types';
+import type { Court, SlotInfo, SlotStatus } from '../types';
 import { toDateOnlyString } from '../lib/utils';
 import { isToday, format } from 'date-fns';
+
+const DURATIONS = [60, 90, 120] as const;
+type Duration = (typeof DURATIONS)[number];
+
+interface DisplaySlot extends SlotInfo {
+  slotCount: number;
+}
+
+function baseSlotLen(slots: SlotInfo[]): number {
+  if (slots.length === 0) return 30;
+  return Math.round(
+    (new Date(slots[0].slotEnd).getTime() - new Date(slots[0].slotStart).getTime()) / 60000
+  );
+}
+
+function groupSlots(slots: SlotInfo[], durationMinutes: Duration): DisplaySlot[] {
+  const base = baseSlotLen(slots);
+  const n = Math.max(1, Math.round(durationMinutes / base));
+  const result: DisplaySlot[] = [];
+
+  for (let i = 0; i + n <= slots.length; i++) {
+    const group = slots.slice(i, i + n);
+    const first = group[0];
+    const last = group[n - 1];
+
+    let status: SlotStatus = 'Available';
+    for (const s of group) {
+      if (s.status !== 'Available') { status = s.status; break; }
+    }
+
+    result.push({
+      slotStart: first.slotStart,
+      slotEnd: last.slotEnd,
+      status,
+      price: status === 'Available' ? group.reduce((sum, s) => sum + s.price, 0) : 0,
+      slotCount: n,
+    });
+  }
+
+  return result;
+}
 
 export function BookingCalendar() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
+  const [duration, setDuration] = useState<Duration>(60);
   const navigate = useNavigate();
   const { isSignedIn } = useAuth();
 
@@ -23,22 +65,25 @@ export function BookingCalendar() {
   const activeCourt = selectedCourtId ?? courts[0]?.id ?? null;
   const activeCourtObj = courts.find(c => c.id === activeCourt);
 
-  const { data: slots = [], isLoading } = useQuery<SlotInfo[]>({
+  const { data: rawSlots = [], isLoading } = useQuery<SlotInfo[]>({
     queryKey: ['availability', activeCourt, toDateOnlyString(selectedDate)],
     queryFn: () => getAvailability(activeCourt!, toDateOnlyString(selectedDate)),
     enabled: !!activeCourt,
   });
 
-  function handleSlotTap(slot: SlotInfo) {
+  const slots = groupSlots(rawSlots, duration);
+  const availableCount = slots.filter(s => s.status === 'Available').length;
+
+  function handleSlotTap(slot: DisplaySlot) {
     if (!isSignedIn) {
       navigate('/login');
       return;
     }
-    navigate(`/book/${activeCourt}/${encodeURIComponent(slot.slotStart)}?price=${slot.price}`);
+    navigate(
+      `/book/${activeCourt}/${encodeURIComponent(slot.slotStart)}?slotCount=${slot.slotCount}&price=${slot.price}`
+    );
   }
 
-  const availableSlots = slots.filter(s => s.status === 'Available');
-  const availableCount = availableSlots.length;
   const dateLabel = isToday(selectedDate)
     ? 'Today'
     : format(selectedDate, 'EEE, MMM d');
@@ -80,6 +125,24 @@ export function BookingCalendar() {
           </div>
         )}
 
+        {/* Duration selector */}
+        <div className="flex items-center gap-2 mb-5">
+          <span className="text-xs font-medium text-[#404942] mr-1">Duration</span>
+          {DURATIONS.map(d => (
+            <button
+              key={d}
+              onClick={() => setDuration(d)}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-all ${
+                duration === d
+                  ? 'bg-[#1b5e3b] text-white border-[#1b5e3b] shadow-sm'
+                  : 'bg-white text-[#404942] border-[#e6e9e4] hover:border-[#1b5e3b] hover:text-[#191c19]'
+              }`}
+            >
+              {d} min
+            </button>
+          ))}
+        </div>
+
         {/* Selected date + availability summary */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
@@ -108,20 +171,19 @@ export function BookingCalendar() {
               {activeCourtObj.openingHours.open.slice(0, 5)} – {activeCourtObj.openingHours.close.slice(0, 5)}
             </span>
             <span className="text-[#bfc9bf]">·</span>
-            <span>{activeCourtObj.slotLengthMinutes} min slots</span>
+            <span>{duration} min session</span>
           </div>
         )}
 
         {/* Slot list */}
         <div className="bg-white rounded-2xl border border-[#e6e9e4] overflow-hidden shadow-sm">
           {isLoading ? (
-            /* Loading skeleton */
             <div className="divide-y divide-[#f0f0f0]">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="flex items-center justify-between px-5 py-4 animate-pulse">
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full bg-gray-200" />
-                    <div className="h-5 w-14 bg-gray-100 rounded" />
+                    <div className="h-5 w-28 bg-gray-100 rounded" />
                   </div>
                   <div className="h-7 w-20 bg-gray-100 rounded-lg" />
                 </div>
@@ -134,47 +196,25 @@ export function BookingCalendar() {
             </div>
           ) : (
             <div>
-              {/* Available slots section */}
-              {availableSlots.length > 0 && (
-                <>
-                  {slots
-                    .filter(s => s.status !== 'Past' && s.status !== 'BlackedOut')
-                    .map(slot => (
-                      <SlotCell
-                        key={slot.slotStart}
-                        slot={slot}
-                        onClick={() => handleSlotTap(slot)}
-                      />
-                    ))}
-                </>
+              {slots
+                .filter(s => s.status === 'Available')
+                .map(slot => (
+                  <SlotCell
+                    key={slot.slotStart}
+                    slot={slot}
+                    onClick={() => handleSlotTap(slot)}
+                  />
+                ))}
+              {slots.filter(s => s.status === 'Available').length === 0 && (
+                <div className="py-16 text-center">
+                  <p className="text-base font-medium text-[#404942]">No slots available</p>
+                  <p className="text-sm text-[#9aab9a] mt-1">Try a different date or court</p>
+                </div>
               )}
-
-              {/* All unavailable */}
-              {availableSlots.length === 0 && slots.map(slot => (
-                <SlotCell
-                  key={slot.slotStart}
-                  slot={slot}
-                  onClick={() => handleSlotTap(slot)}
-                />
-              ))}
             </div>
           )}
         </div>
 
-        {/* Legend */}
-        {!isLoading && slots.length > 0 && (
-          <div className="flex items-center gap-4 mt-4 text-xs text-[#9aab9a]">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#1b5e3b]" /> Available
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-400" /> Held
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-gray-300" /> Booked
-            </span>
-          </div>
-        )}
       </div>
     </div>
   );

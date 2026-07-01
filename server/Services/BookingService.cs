@@ -11,12 +11,17 @@ public class BookingSettings
     public int BookingHorizonDays { get; set; } = 14;
 }
 
+public record HoldGroup(Guid HoldGroupId, decimal TotalPrice, int DurationMinutes);
+
 public class BookingService(AppDbContext db, PricingService pricing, IConfiguration config)
 {
     private BookingSettings Settings => config.GetSection("Booking").Get<BookingSettings>() ?? new();
 
-    public async Task<Hold> CreateHoldAsync(Guid courtId, DateTime slotStart, string userId)
+    public async Task<HoldGroup> CreateHoldAsync(Guid courtId, DateTime slotStart, string userId, int slotCount = 1)
     {
+        if (slotCount < 1 || slotCount > 4)
+            throw new InvalidOperationException("Slot count must be between 1 and 4");
+
         var court = await db.Courts
             .Include(c => c.PriceRates)
             .FirstOrDefaultAsync(c => c.Id == courtId && c.Active)
@@ -29,50 +34,79 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
         if (slotStart > now.AddDays(Settings.BookingHorizonDays))
             throw new InvalidOperationException("Slot is beyond booking horizon");
 
-        // Check availability
-        var conflictingHold = await db.Holds.AnyAsync(h =>
-            h.CourtId == courtId && h.SlotStart == slotStart && h.ExpiresAt > now);
+        var slotStarts = Enumerable.Range(0, slotCount)
+            .Select(i => slotStart.AddMinutes(i * court.SlotLengthMinutes))
+            .ToList();
 
-        var conflictingBooking = await db.Bookings.AnyAsync(bk =>
-            bk.CourtId == courtId && bk.SlotStarts.Contains(slotStart) && bk.State != BookingState.Cancelled);
+        var slotStartsSet = slotStarts.ToHashSet();
 
-        if (conflictingHold || conflictingBooking)
+        // Check existing holds — one row per slot so no expansion needed
+        var heldSlots = await db.Holds
+            .Where(h => h.CourtId == courtId && h.ExpiresAt > now)
+            .Select(h => h.SlotStart)
+            .ToListAsync();
+
+        if (heldSlots.Any(s => slotStartsSet.Contains(s)))
             throw new InvalidOperationException("Slot is no longer available");
 
-        var hold = new Hold
-        {
-            Id = Guid.NewGuid(),
-            CourtId = courtId,
-            SlotStart = slotStart,
-            UserId = userId,
-            CapturedPrice = pricing.GetPrice(court, slotStart),
-            ExpiresAt = now.AddMinutes(Settings.HoldTtlMinutes)
-        };
+        // Check confirmed bookings (stored as arrays, so must check in memory)
+        var bookedSlotArrays = await db.Bookings
+            .Where(bk => bk.CourtId == courtId && bk.State != BookingState.Cancelled)
+            .Select(bk => bk.SlotStarts)
+            .ToListAsync();
 
-        db.Holds.Add(hold);
+        if (bookedSlotArrays.SelectMany(ss => ss).Any(s => slotStartsSet.Contains(s)))
+            throw new InvalidOperationException("Slot is no longer available");
+
+        // Create one Hold row per slot, all sharing the same HoldGroupId.
+        // The DB UNIQUE(CourtId, SlotStart) constraint is the concurrency backstop.
+        var holdGroupId = Guid.NewGuid();
+        var totalPrice = 0m;
+
+        foreach (var slot in slotStarts)
+        {
+            var price = pricing.GetPrice(court, slot);
+            totalPrice += price;
+            db.Holds.Add(new Hold
+            {
+                Id = Guid.NewGuid(),
+                HoldGroupId = holdGroupId,
+                CourtId = courtId,
+                SlotStart = slot,
+                UserId = userId,
+                CapturedPrice = price,
+                ExpiresAt = now.AddMinutes(Settings.HoldTtlMinutes)
+            });
+        }
+
         await db.SaveChangesAsync();
-        return hold;
+        return new HoldGroup(holdGroupId, totalPrice, slotCount * court.SlotLengthMinutes);
     }
 
-    public async Task<Booking> ConfirmBookingAsync(string stripePaymentIntentId, Guid holdId)
+    public async Task<Booking> ConfirmBookingAsync(string stripePaymentIntentId, Guid holdGroupId)
     {
-        var hold = await db.Holds.FindAsync(holdId)
-            ?? throw new KeyNotFoundException("Hold not found");
+        var holds = await db.Holds
+            .Where(h => h.HoldGroupId == holdGroupId)
+            .OrderBy(h => h.SlotStart)
+            .ToListAsync();
 
+        if (holds.Count == 0) throw new KeyNotFoundException("Hold not found");
+
+        var first = holds[0];
         var booking = new Booking
         {
             Id = Guid.NewGuid(),
-            CourtId = hold.CourtId,
-            SlotStarts = [hold.SlotStart],
-            UserId = hold.UserId,
-            AmountCharged = hold.CapturedPrice,
+            CourtId = first.CourtId,
+            SlotStarts = holds.Select(h => h.SlotStart).ToList(),
+            UserId = first.UserId,
+            AmountCharged = holds.Sum(h => h.CapturedPrice),
             State = BookingState.Completed,
             StripePaymentIntentId = stripePaymentIntentId,
             CreatedAt = DateTime.UtcNow
         };
 
         db.Bookings.Add(booking);
-        db.Holds.Remove(hold);
+        db.Holds.RemoveRange(holds);
         await db.SaveChangesAsync();
         return booking;
     }
@@ -100,11 +134,13 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
         await db.SaveChangesAsync();
     }
 
-    public async Task UpdateHoldSessionAsync(Guid holdId, string sessionId)
+    public async Task UpdateHoldGroupSessionAsync(Guid holdGroupId, string sessionId)
     {
-        var hold = await db.Holds.FindAsync(holdId)
-            ?? throw new KeyNotFoundException("Hold not found");
-        hold.StripeSessionId = sessionId;
+        var holds = await db.Holds
+            .Where(h => h.HoldGroupId == holdGroupId)
+            .ToListAsync();
+        foreach (var hold in holds)
+            hold.StripeSessionId = sessionId;
         await db.SaveChangesAsync();
     }
 

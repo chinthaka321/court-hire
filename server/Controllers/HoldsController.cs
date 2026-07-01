@@ -19,7 +19,7 @@ public class HoldsController(BookingService booking, IConfiguration config) : Co
 
         try
         {
-            var hold = await booking.CreateHoldAsync(req.CourtId, req.SlotStart.ToUniversalTime(), userId);
+            var holdGroup = await booking.CreateHoldAsync(req.CourtId, req.SlotStart.ToUniversalTime(), userId, req.SlotCount);
 
             var options = new SessionCreateOptions
             {
@@ -29,27 +29,26 @@ public class HoldsController(BookingService booking, IConfiguration config) : Co
                     PriceData = new SessionLineItemPriceDataOptions
                     {
                         Currency = "usd",
-                        UnitAmountDecimal = hold.CapturedPrice * 100,
+                        UnitAmountDecimal = holdGroup.TotalPrice * 100,
                         ProductData = new SessionLineItemPriceDataProductDataOptions
                         {
-                            Name = $"Tennis Court Booking — {req.SlotStart:MMM d, h:mm tt}"
+                            Name = $"Tennis Court Booking — {req.SlotStart:MMM d, h:mm tt} ({holdGroup.DurationMinutes} min)"
                         }
                     },
                     Quantity = 1
                 }],
                 Mode = "payment",
-                SuccessUrl = $"{config["App:ClientUrl"]}/booking/confirming?holdId={hold.Id}",
+                SuccessUrl = $"{config["App:ClientUrl"]}/booking/confirming?holdGroupId={holdGroup.HoldGroupId}",
                 CancelUrl = $"{config["App:ClientUrl"]}/",
-                Metadata = new Dictionary<string, string> { ["holdId"] = hold.Id.ToString() }
+                Metadata = new Dictionary<string, string> { ["holdGroupId"] = holdGroup.HoldGroupId.ToString() }
             };
 
             var service = new SessionService();
             var session = await service.CreateAsync(options);
 
-            hold.StripeSessionId = session.Id;
-            await booking.UpdateHoldSessionAsync(hold.Id, session.Id);
+            await booking.UpdateHoldGroupSessionAsync(holdGroup.HoldGroupId, session.Id);
 
-            return Ok(new { checkoutUrl = session.Url, holdId = hold.Id });
+            return Ok(new { checkoutUrl = session.Url, holdGroupId = holdGroup.HoldGroupId });
         }
         catch (InvalidOperationException ex)
         {
@@ -58,4 +57,4 @@ public class HoldsController(BookingService booking, IConfiguration config) : Co
     }
 }
 
-public record CreateHoldRequest(Guid CourtId, DateTime SlotStart);
+public record CreateHoldRequest(Guid CourtId, DateTime SlotStart, int SlotCount = 1);

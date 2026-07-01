@@ -19,8 +19,12 @@ The exact datetime marking the beginning of a slot. Used as the primary identifi
 _Avoid_: start time, slot time
 
 **Slot length**:
-The duration of each slot on a court, in minutes. Defaults to 60 min. Admin-configurable per court.
+The base time unit of the availability grid — fixed at 30 minutes system-wide. Not admin-configurable. Customers choose a session duration (a multiple of the slot length) at booking time.
 _Avoid_: duration, block size
+
+**Session duration**:
+The length of a booking as chosen by the customer: 60, 90, or 120 minutes. Always a multiple of the slot length. Determines how many consecutive slots a booking covers.
+_Avoid_: booking duration, slot duration, session length
 
 **Availability grid**:
 The computed set of bookable slots for a court on a given day: full time grid minus booked, held, and blacked-out intervals.

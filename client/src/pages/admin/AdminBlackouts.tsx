@@ -133,7 +133,7 @@ export function AdminBlackouts() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-sm font-semibold text-[#191c19]">
-                      {(bl as any).court?.name ?? 'Court'}
+                      {courts.find(c => c.id === bl.courtId)?.name ?? 'Court'}
                     </p>
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                       upcoming ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCourts, createCourt, updateCourt } from '../../lib/api';
+import { adminGetCourts, adminToggleCourt, createCourt, updateCourt } from '../../lib/api';
 import type { Court } from '../../types';
 
 interface CourtForm {
@@ -11,7 +11,7 @@ interface CourtForm {
   dayNightBoundary: string;
 }
 
-const blank: CourtForm = { name: '', open: '07:00', close: '22:00', slotLengthMinutes: 60, dayNightBoundary: '18:00' };
+const blank: CourtForm = { name: '', open: '07:00', close: '22:00', slotLengthMinutes: 30, dayNightBoundary: '18:00' };
 
 const inputCls = 'w-full border border-[#bfc9bf] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1b5e3b] bg-white';
 
@@ -31,17 +31,26 @@ export function AdminCourts() {
   const [showForm, setShowForm] = useState(false);
 
   const { data: courts = [] } = useQuery<Court[]>({
-    queryKey: ['courts'],
-    queryFn: getCourts,
+    queryKey: ['admin-courts'],
+    queryFn: adminGetCourts,
   });
 
   const saveMutation = useMutation({
     mutationFn: () => editing ? updateCourt(editing, form) : createCourt(form),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-courts'] });
       qc.invalidateQueries({ queryKey: ['courts'] });
       setShowForm(false);
       setEditing(null);
       setForm(blank);
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, active }: { id: string; active: boolean }) => adminToggleCourt(id, active),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-courts'] });
+      qc.invalidateQueries({ queryKey: ['courts'] });
     },
   });
 
@@ -62,6 +71,9 @@ export function AdminCourts() {
     setEditing(null);
     setForm(blank);
   }
+
+  const activeCourts = courts.filter(c => c.active);
+  const inactiveCourts = courts.filter(c => !c.active);
 
   return (
     <div className="px-4 sm:px-6 py-6 max-w-4xl">
@@ -105,13 +117,9 @@ export function AdminCourts() {
                 onChange={e => setForm(f => ({ ...f, close: e.target.value }))} />
             </Field>
             <Field label="Slot length (minutes)">
-              <select className={inputCls} value={form.slotLengthMinutes}
-                onChange={e => setForm(f => ({ ...f, slotLengthMinutes: +e.target.value }))}>
-                <option value={30}>30 min</option>
-                <option value={60}>60 min</option>
-                <option value={90}>90 min</option>
-                <option value={120}>120 min</option>
-              </select>
+              <div className={`${inputCls} text-[#404942] bg-[#f8faf5] cursor-not-allowed`}>
+                30 min — fixed base unit (customers choose 60 / 90 / 120 when booking)
+              </div>
             </Field>
             <Field label="Day / Night boundary">
               <input type="time" className={inputCls} value={form.dayNightBoundary}
@@ -132,49 +140,120 @@ export function AdminCourts() {
               Cancel
             </button>
           </div>
+          {saveMutation.isError && (
+            <p className="text-xs text-red-600 mt-3">Failed to save. Please try again.</p>
+          )}
         </div>
       )}
 
-      {/* Court cards */}
+      {/* Active courts */}
       {courts.length === 0 ? (
         <div className="text-center py-16 text-sm text-[#404942]">
           No courts yet. Add your first court above.
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {courts.map(c => (
-            <div key={c.id} className="bg-white rounded-xl border border-[#e6e9e4] p-5 hover:border-[#1b5e3b]/40 transition-colors">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <p className="font-semibold text-[#191c19] text-base">{c.name}</p>
-                  <p className="text-xs text-green-700 bg-green-50 rounded-full px-2 py-0.5 inline-block mt-1">Active</p>
-                </div>
-                <button
-                  onClick={() => editCourt(c)}
-                  className="text-xs font-medium text-[#1b5e3b] border border-[#1b5e3b] rounded-lg px-3 py-1.5 hover:bg-[#e8f5ee] transition-colors"
-                >
-                  Edit
-                </button>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-[#404942]">Hours</span>
-                  <span className="font-medium text-[#191c19]">
-                    {c.openingHours.open.slice(0, 5)} – {c.openingHours.close.slice(0, 5)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#404942]">Slot length</span>
-                  <span className="font-medium text-[#191c19]">{c.slotLengthMinutes} min</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#404942]">Day/Night split</span>
-                  <span className="font-medium text-[#191c19]">{c.dayNightBoundary.slice(0, 5)}</span>
-                </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {activeCourts.map(c => (
+              <CourtCard
+                key={c.id}
+                court={c}
+                onEdit={() => editCourt(c)}
+                onToggle={() => {
+                  if (window.confirm(`Deactivate "${c.name}"? It will be hidden from customers.`)) {
+                    toggleMutation.mutate({ id: c.id, active: false });
+                  }
+                }}
+                toggling={toggleMutation.isPending}
+              />
+            ))}
+          </div>
+
+          {/* Inactive courts */}
+          {inactiveCourts.length > 0 && (
+            <div className="mt-6">
+              <p className="text-xs font-semibold text-[#9aab9a] uppercase tracking-wider mb-3">
+                Inactive Courts
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {inactiveCourts.map(c => (
+                  <CourtCard
+                    key={c.id}
+                    court={c}
+                    onEdit={() => editCourt(c)}
+                    onToggle={() => toggleMutation.mutate({ id: c.id, active: true })}
+                    toggling={toggleMutation.isPending}
+                  />
+                ))}
               </div>
             </div>
-          ))}
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function CourtCard({
+  court, onEdit, onToggle, toggling,
+}: {
+  court: Court;
+  onEdit: () => void;
+  onToggle: () => void;
+  toggling: boolean;
+}) {
+  return (
+    <div className={`bg-white rounded-xl border p-5 transition-colors ${
+      court.active
+        ? 'border-[#e6e9e4] hover:border-[#1b5e3b]/40'
+        : 'border-[#f0f0f0] opacity-70'
+    }`}>
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <p className="font-semibold text-[#191c19] text-base">{court.name}</p>
+          {court.active ? (
+            <p className="text-xs text-green-700 bg-green-50 rounded-full px-2 py-0.5 inline-block mt-1">Active</p>
+          ) : (
+            <p className="text-xs text-gray-500 bg-gray-100 rounded-full px-2 py-0.5 inline-block mt-1">Inactive</p>
+          )}
         </div>
+        <button
+          onClick={onEdit}
+          className="text-xs font-medium text-[#1b5e3b] border border-[#1b5e3b] rounded-lg px-3 py-1.5 hover:bg-[#e8f5ee] transition-colors"
+        >
+          Edit
+        </button>
+      </div>
+
+      <div className="space-y-2 text-sm mb-4">
+        <div className="flex justify-between">
+          <span className="text-[#404942]">Hours</span>
+          <span className="font-medium text-[#191c19]">
+            {court.openingHours.open.slice(0, 5)} – {court.openingHours.close.slice(0, 5)}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-[#404942]">Day/Night split</span>
+          <span className="font-medium text-[#191c19]">{court.dayNightBoundary.slice(0, 5)}</span>
+        </div>
+      </div>
+
+      {court.active ? (
+        <button
+          onClick={onToggle}
+          disabled={toggling}
+          className="w-full text-xs font-medium text-red-600 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 transition-colors disabled:opacity-50"
+        >
+          Deactivate
+        </button>
+      ) : (
+        <button
+          onClick={onToggle}
+          disabled={toggling}
+          className="w-full text-xs font-medium text-[#1b5e3b] border border-[#1b5e3b] rounded-lg px-3 py-1.5 hover:bg-[#e8f5ee] transition-colors disabled:opacity-50"
+        >
+          Reactivate
+        </button>
       )}
     </div>
   );

@@ -43,6 +43,9 @@ export function SlotCell({ slot, selected, onClick }: Props) {
           isAvailable ? 'text-[#191c19]' : 'text-[#9aab9a]',
         )}>
           {formatTime(slot.slotStart)}
+          <span className={cn('text-sm font-normal ml-1', isAvailable ? 'text-[#404942]' : 'text-[#bfc9bf]')}>
+            – {formatTime(slot.slotEnd)}
+          </span>
         </span>
       </div>
 

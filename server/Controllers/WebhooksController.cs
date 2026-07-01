@@ -27,12 +27,12 @@ public class WebhooksController(BookingService bookingService, IConfiguration co
         if (stripeEvent.Type == EventTypes.CheckoutSessionCompleted)
         {
             var session = (Stripe.Checkout.Session)stripeEvent.Data.Object;
-            if (session.Metadata.TryGetValue("holdId", out var holdIdStr) &&
-                Guid.TryParse(holdIdStr, out var holdId))
+            if (session.Metadata.TryGetValue("holdGroupId", out var holdGroupIdStr) &&
+                Guid.TryParse(holdGroupIdStr, out var holdGroupId))
             {
                 try
                 {
-                    await bookingService.ConfirmBookingAsync(session.PaymentIntentId, holdId);
+                    await bookingService.ConfirmBookingAsync(session.PaymentIntentId, holdGroupId);
                 }
                 catch (KeyNotFoundException)
                 {

@@ -12,6 +12,27 @@ namespace TennisBooking.Controllers;
 [Authorize(Policy = "AdminOnly")]
 public class AdminController(AppDbContext db, BookingService bookingService, StripeRefundService refundService) : ControllerBase
 {
+    // Courts (admin view — includes inactive)
+    [HttpGet("courts")]
+    public async Task<IActionResult> GetAllCourts()
+    {
+        var courts = await db.Courts
+            .AsNoTracking()
+            .Select(c => new { c.Id, c.Name, c.SlotLengthMinutes, c.OpeningHours, c.DayNightBoundary, c.Active })
+            .ToListAsync();
+        return Ok(courts);
+    }
+
+    [HttpPatch("courts/{id:guid}/active")]
+    public async Task<IActionResult> SetActive(Guid id, [FromBody] SetActiveRequest req)
+    {
+        var court = await db.Courts.FindAsync(id);
+        if (court is null) return NotFound();
+        court.Active = req.Active;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     // Pricing
     [HttpGet("courts/{courtId:guid}/pricing")]
     public async Task<IActionResult> GetPricing(Guid courtId)
@@ -86,6 +107,7 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
         [FromQuery] Guid? courtId,
         [FromQuery] DateOnly? date,
         [FromQuery] string? userId,
+        [FromQuery] string? search,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
@@ -93,6 +115,10 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
 
         if (courtId.HasValue) query = query.Where(b => b.CourtId == courtId.Value);
         if (userId is not null) query = query.Where(b => b.UserId == userId);
+        if (search is not null)
+            query = query.Where(b =>
+                b.User.Email.Contains(search) ||
+                (b.User.Name != null && b.User.Name.Contains(search)));
         if (date.HasValue)
         {
             var start = date.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
@@ -132,3 +158,4 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
 
 public record UpsertRateRequest(DayType DayType, PriceBand Band, decimal Price);
 public record CreateBlackoutRequest(Guid CourtId, DateTime Start, DateTime End, string? Reason);
+public record SetActiveRequest(bool Active);

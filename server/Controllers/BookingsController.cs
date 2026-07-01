@@ -29,17 +29,17 @@ public class BookingsController(AppDbContext db, BookingService bookingService, 
         return Ok(bookings);
     }
 
-    [HttpGet("by-hold/{holdId:guid}")]
-    public async Task<IActionResult> ByHold(Guid holdId)
+    [HttpGet("by-hold-group/{holdGroupId:guid}")]
+    public async Task<IActionResult> ByHoldGroup(Guid holdGroupId)
     {
+        var holdStillExists = await db.Holds.AnyAsync(h => h.HoldGroupId == holdGroupId);
+        if (holdStillExists) return Ok(new { status = "pending" });
+
         var booking = await db.Bookings
             .Where(b => b.UserId == UserId)
             .OrderByDescending(b => b.CreatedAt)
             .FirstOrDefaultAsync();
 
-        // Return booking if hold is gone (converted) or still pending
-        var holdStillExists = await db.Holds.AnyAsync(h => h.Id == holdId);
-        if (holdStillExists) return Ok(new { status = "pending" });
         if (booking is null) return Ok(new { status = "pending" });
         return Ok(new { status = "confirmed", bookingId = booking.Id });
     }

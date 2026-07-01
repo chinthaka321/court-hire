@@ -111,7 +111,10 @@ export function AdminBookings() {
                     <p className="text-xs text-[#404942] mt-0.5">{b.id.slice(0, 8).toUpperCase()}</p>
                   </div>
                   <p className="text-sm text-[#404942] truncate">{(b as any).user?.email ?? '—'}</p>
-                  <p className="text-sm text-[#191c19]">{formatDateTime(b.slotStarts[0])}</p>
+                  <div>
+                    <p className="text-sm text-[#191c19]">{formatDateTime(b.slotStarts[0])}</p>
+                    <p className="text-xs text-[#404942] mt-0.5">{b.slotStarts.length * 30} min</p>
+                  </div>
                   <p className="text-sm font-semibold text-[#191c19]">{formatPrice(b.amountCharged)}</p>
                   <StateBadge state={b.state} />
                   <div>
