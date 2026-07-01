@@ -45,6 +45,7 @@ builder.Services.AddScoped<PricingService>();
 builder.Services.AddScoped<AvailabilityService>();
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<StripeRefundService>();
+builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<SweepExpiredHoldsJob>();
 builder.Services.AddScoped<SendReminderEmailsJob>();
 
@@ -83,7 +84,7 @@ using (var scope = app.Services.CreateScope())
                     Open  = new TimeOnly(7, 0),
                     Close = new TimeOnly(22, 0)
                 },
-                SlotLengthMinutes = 60,
+                SlotLengthMinutes = 30,
                 DayNightBoundary = new TimeOnly(18, 0),
                 Active = true
             },
@@ -96,7 +97,7 @@ using (var scope = app.Services.CreateScope())
                     Open  = new TimeOnly(8, 0),
                     Close = new TimeOnly(21, 0)
                 },
-                SlotLengthMinutes = 60,
+                SlotLengthMinutes = 30,
                 DayNightBoundary = new TimeOnly(17, 0),
                 Active = true
             }

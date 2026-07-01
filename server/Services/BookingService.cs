@@ -9,6 +9,7 @@ public class BookingSettings
     public int HoldTtlMinutes { get; set; } = 7;
     public int CancellationWindowHours { get; set; } = 24;
     public int BookingHorizonDays { get; set; } = 14;
+    public int ReminderHoursBefore { get; set; } = 24;
 }
 
 public record HoldGroup(Guid HoldGroupId, decimal TotalPrice, int DurationMinutes);

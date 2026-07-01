@@ -10,7 +10,7 @@ namespace TennisBooking.Controllers;
 [ApiController]
 [Route("api/admin")]
 [Authorize(Policy = "AdminOnly")]
-public class AdminController(AppDbContext db, BookingService bookingService, StripeRefundService refundService) : ControllerBase
+public class AdminController(AppDbContext db, BookingService bookingService, StripeRefundService refundService, EmailService emailService) : ControllerBase
 {
     // Courts (admin view — includes inactive)
     [HttpGet("courts")]
@@ -144,13 +144,18 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
     [HttpDelete("bookings/{id:guid}")]
     public async Task<IActionResult> AdminCancelBooking(Guid id)
     {
-        var booking = await db.Bookings.FindAsync(id);
+        var booking = await db.Bookings
+            .Include(b => b.User)
+            .Include(b => b.Court)
+            .FirstOrDefaultAsync(b => b.Id == id);
         if (booking is null) return NotFound();
 
         await bookingService.CancelBookingAsync(id, booking.UserId, isAdmin: true);
 
         if (!string.IsNullOrEmpty(booking.StripePaymentIntentId))
             await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
+
+        await emailService.SendBookingCancelledAsync(booking);
 
         return NoContent();
     }

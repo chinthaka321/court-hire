@@ -9,7 +9,7 @@ namespace TennisBooking.Controllers;
 [ApiController]
 [Route("api/bookings")]
 [Authorize]
-public class BookingsController(AppDbContext db, BookingService bookingService, StripeRefundService refundService) : ControllerBase
+public class BookingsController(AppDbContext db, BookingService bookingService, StripeRefundService refundService, EmailService emailService) : ControllerBase
 {
     private string UserId => User.FindFirst("sub")!.Value;
 
@@ -49,13 +49,20 @@ public class BookingsController(AppDbContext db, BookingService bookingService, 
     {
         try
         {
-            var booking = await db.Bookings.FindAsync(id)
+            var booking = await db.Bookings
+                .Include(b => b.User)
+                .Include(b => b.Court)
+                .FirstOrDefaultAsync(b => b.Id == id)
                 ?? throw new KeyNotFoundException();
+
+            if (booking.UserId != UserId) return Forbid();
 
             await bookingService.CancelBookingAsync(id, UserId);
 
             if (!string.IsNullOrEmpty(booking.StripePaymentIntentId))
                 await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
+
+            await emailService.SendBookingCancelledAsync(booking);
 
             return NoContent();
         }

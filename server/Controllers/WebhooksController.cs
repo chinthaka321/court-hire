@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Stripe;
+using TennisBooking.Data;
 using TennisBooking.Services;
 
 namespace TennisBooking.Controllers;
 
 [ApiController]
 [Route("api/webhooks")]
-public class WebhooksController(BookingService bookingService, IConfiguration config) : ControllerBase
+public class WebhooksController(BookingService bookingService, EmailService emailService, AppDbContext db, IConfiguration config) : ControllerBase
 {
     [HttpPost("stripe")]
     public async Task<IActionResult> Stripe()
@@ -32,7 +34,13 @@ public class WebhooksController(BookingService bookingService, IConfiguration co
             {
                 try
                 {
-                    await bookingService.ConfirmBookingAsync(session.PaymentIntentId, holdGroupId);
+                    var booking = await bookingService.ConfirmBookingAsync(session.PaymentIntentId, holdGroupId);
+                    var full = await db.Bookings
+                        .Include(b => b.User)
+                        .Include(b => b.Court)
+                        .FirstOrDefaultAsync(b => b.Id == booking.Id);
+                    if (full is not null)
+                        await emailService.SendBookingConfirmedAsync(full);
                 }
                 catch (KeyNotFoundException)
                 {
