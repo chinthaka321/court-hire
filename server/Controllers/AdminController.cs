@@ -150,10 +150,20 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
             .FirstOrDefaultAsync(b => b.Id == id);
         if (booking is null) return NotFound();
 
-        await bookingService.CancelBookingAsync(id, booking.UserId, isAdmin: true);
+        try
+        {
+            await bookingService.CancelBookingAsync(id, booking.UserId, isAdmin: true);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
 
         if (!string.IsNullOrEmpty(booking.StripePaymentIntentId))
-            await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
+        {
+            booking.StripeRefundId = await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
+            await db.SaveChangesAsync();
+        }
 
         await emailService.SendBookingCancelledAsync(booking);
 

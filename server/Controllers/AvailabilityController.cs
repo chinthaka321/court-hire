@@ -8,11 +8,14 @@ namespace TennisBooking.Controllers;
 public class AvailabilityController(AvailabilityService availability) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> Get([FromQuery] Guid courtId, [FromQuery] DateOnly date)
+    public async Task<IActionResult> Get([FromQuery] Guid courtId, [FromQuery] DateOnly? date)
     {
+        if (date is null)
+            return BadRequest("date is required");
+
         try
         {
-            var slots = await availability.GetAvailabilityAsync(courtId, date);
+            var slots = await availability.GetAvailabilityAsync(courtId, date.Value);
             return Ok(slots);
         }
         catch (KeyNotFoundException ex)

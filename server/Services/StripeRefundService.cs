@@ -4,7 +4,7 @@ namespace TennisBooking.Services;
 
 public class StripeRefundService
 {
-    public async Task RefundAsync(string paymentIntentId, decimal amount, Guid bookingId)
+    public async Task<string> RefundAsync(string paymentIntentId, decimal amount, Guid bookingId)
     {
         var options = new RefundCreateOptions
         {
@@ -14,6 +14,14 @@ public class StripeRefundService
         };
         var service = new RefundService();
         var refund = await service.CreateAsync(options);
-        _ = refund.Id;
+        return refund.Id;
+    }
+
+    /// <summary>Refunds the full charge — used when payment settles after the hold expired.</summary>
+    public async Task<string> RefundFullAsync(string paymentIntentId)
+    {
+        var service = new RefundService();
+        var refund = await service.CreateAsync(new RefundCreateOptions { PaymentIntent = paymentIntentId });
+        return refund.Id;
     }
 }

@@ -52,7 +52,7 @@ public class AvailabilityService(AppDbContext db, PricingService pricing)
 
             if (slotStart < now)
                 status = SlotStatus.Past;
-            else if (blackouts.Any(bl => bl.Start <= slotStart && bl.End >= slotEnd))
+            else if (blackouts.Any(bl => bl.Start < slotEnd && bl.End > slotStart))
                 status = SlotStatus.BlackedOut;
             else if (bookedSet.Contains(slotStart))
                 status = SlotStatus.Booked;
@@ -61,9 +61,16 @@ public class AvailabilityService(AppDbContext db, PricingService pricing)
             else
                 status = SlotStatus.Available;
 
-            var price = status == SlotStatus.Available
-                ? pricing.GetPrice(court, slotStart)
-                : 0m;
+            var price = 0m;
+            if (status == SlotStatus.Available)
+            {
+                // A court with no configured rate must not be bookable — show it as closed.
+                var rate = pricing.TryGetPrice(court, slotStart);
+                if (rate is null)
+                    status = SlotStatus.BlackedOut;
+                else
+                    price = rate.Value;
+            }
 
             return new SlotInfo(slotStart, slotEnd, status, price);
         }).ToList();

@@ -38,6 +38,11 @@ export interface Booking {
   court: { id: string; name: string };
 }
 
+/** Booking as returned by the admin endpoints — includes the customer. */
+export interface AdminBooking extends Booking {
+  user: { id: string; email: string; name?: string | null };
+}
+
 export interface PriceRate {
   id: string;
   courtId: string;

@@ -20,20 +20,20 @@ export function Navbar() {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-[#e6e9e4]">
+      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-surface-high">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
 
             {/* Logo */}
             <Link to="/" className="flex items-center gap-2.5 group">
-              <div className="w-8 h-8 rounded-lg bg-[#1b5e3b] flex items-center justify-center shadow-sm group-hover:bg-[#004527] transition-colors">
+              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-sm group-hover:bg-primary-dark transition-colors">
                 <svg viewBox="0 0 20 20" fill="white" className="w-4 h-4">
                   <circle cx="10" cy="10" r="7" stroke="white" strokeWidth="1.5" fill="none" />
                   <path d="M3.5 10 Q10 4 16.5 10 Q10 16 3.5 10" fill="white" opacity="0.9" />
                 </svg>
               </div>
-              <span className="font-bold text-[#191c19] text-lg tracking-tight">
-                Court<span className="text-[#1b5e3b]">Book</span>
+              <span className="font-bold text-on-surface text-lg tracking-tight">
+                Court<span className="text-primary">Book</span>
               </span>
             </Link>
 
@@ -45,13 +45,13 @@ export function Navbar() {
                   to={to}
                   className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     isActive(to, exact)
-                      ? 'text-[#1b5e3b] bg-[#e8f5ee]'
-                      : 'text-[#404942] hover:text-[#191c19] hover:bg-[#f8faf5]'
+                      ? 'text-primary bg-primary-light'
+                      : 'text-on-surface-muted hover:text-on-surface hover:bg-surface'
                   }`}
                 >
                   {label}
                   {isActive(to, exact) && (
-                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#1b5e3b]" />
+                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />
                   )}
                 </Link>
               ))}
@@ -65,7 +65,7 @@ export function Navbar() {
                     {/* Mobile: My Bookings icon */}
                     <Link
                       to="/my-bookings"
-                      className="md:hidden relative p-2 rounded-lg text-[#404942] hover:bg-[#f8faf5] transition-colors"
+                      className="md:hidden relative p-2 rounded-lg text-on-surface-muted hover:bg-surface transition-colors"
                       title="My Bookings"
                     >
                       <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
@@ -76,7 +76,7 @@ export function Navbar() {
                   </div>
                 ) : (
                   <SignInButton mode="modal">
-                    <button className="flex items-center gap-2 text-sm font-semibold text-white bg-[#1b5e3b] px-4 py-2 rounded-lg hover:bg-[#004527] transition-colors shadow-sm">
+                    <button className="flex items-center gap-2 text-sm font-semibold text-white bg-primary px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors shadow-sm">
                       Sign In
                       <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
                         <path fillRule="evenodd" d="M1 8a.5.5 0 01.5-.5h11.793l-3.147-3.146a.5.5 0 01.708-.708l4 4a.5.5 0 010 .708l-4 4a.5.5 0 01-.708-.708L13.293 8.5H1.5A.5.5 0 011 8z" clipRule="evenodd" />
@@ -89,7 +89,7 @@ export function Navbar() {
               {/* Mobile hamburger */}
               <button
                 onClick={() => setMobileOpen(o => !o)}
-                className="md:hidden p-2 rounded-lg text-[#404942] hover:bg-[#f8faf5] transition-colors"
+                className="md:hidden p-2 rounded-lg text-on-surface-muted hover:bg-surface transition-colors"
                 aria-label="Menu"
               >
                 {mobileOpen ? (
@@ -108,7 +108,7 @@ export function Navbar() {
 
         {/* Mobile menu */}
         {mobileOpen && (
-          <div className="md:hidden border-t border-[#e6e9e4] bg-white px-4 py-3 flex flex-col gap-1">
+          <div className="md:hidden border-t border-surface-high bg-white px-4 py-3 flex flex-col gap-1">
             {navLinks.map(({ to, label, exact }) => (
               <Link
                 key={to}
@@ -116,8 +116,8 @@ export function Navbar() {
                 onClick={() => setMobileOpen(false)}
                 className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive(to, exact)
-                    ? 'text-[#1b5e3b] bg-[#e8f5ee]'
-                    : 'text-[#404942] hover:bg-[#f8faf5] hover:text-[#191c19]'
+                    ? 'text-primary bg-primary-light'
+                    : 'text-on-surface-muted hover:bg-surface hover:text-on-surface'
                 }`}
               >
                 {label}

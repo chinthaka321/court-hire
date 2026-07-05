@@ -2,15 +2,25 @@ import axios from 'axios';
 
 export const api = axios.create({ baseURL: '/api' });
 
-api.interceptors.request.use(async (config) => {
-  // Clerk token injected by useAuth hook via setAuthToken
-  const token = (window as any).__clerkToken;
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+// Clerk token kept up to date by the TokenSyncer component via setAuthToken
+let authToken: string | null = null;
+
+api.interceptors.request.use((config) => {
+  if (authToken) config.headers.Authorization = `Bearer ${authToken}`;
   return config;
 });
 
 export function setAuthToken(token: string | null) {
-  (window as any).__clerkToken = token;
+  authToken = token;
+}
+
+/** Extracts the server's `{ error }` message from a failed request, or falls back. */
+export function apiErrorMessage(e: unknown, fallback: string): string {
+  if (axios.isAxiosError(e)) {
+    const data = e.response?.data as { error?: string } | undefined;
+    if (data?.error) return data.error;
+  }
+  return fallback;
 }
 
 // Courts

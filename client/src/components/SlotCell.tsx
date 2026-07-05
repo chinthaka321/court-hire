@@ -18,11 +18,11 @@ export function SlotCell({ slot, selected, onClick }: Props) {
       onClick={isAvailable ? onClick : undefined}
       className={cn(
         'group flex items-center justify-between px-4 sm:px-5 border-b border-[#f0f0f0] last:border-b-0 transition-all',
-        isAvailable && 'cursor-pointer hover:bg-[#f0f7f3] active:bg-[#e8f5ee]',
+        isAvailable && 'cursor-pointer hover:bg-[#f0f7f3] active:bg-primary-light',
         isHeld && 'bg-amber-50/60 cursor-not-allowed',
         isBooked && 'bg-[#fafafa] cursor-not-allowed',
         isPast && 'bg-[#fafafa] opacity-40 cursor-not-allowed',
-        selected && 'bg-[#e8f5ee] border-l-2 border-l-[#1b5e3b]',
+        selected && 'bg-primary-light border-l-2 border-l-primary',
       )}
       style={{ minHeight: '64px' }}
     >
@@ -30,20 +30,20 @@ export function SlotCell({ slot, selected, onClick }: Props) {
       <div className="flex items-center gap-3">
         {isAvailable && (
           <div className={cn(
-            'w-2 h-2 rounded-full flex-shrink-0 transition-colors',
-            'bg-[#1b5e3b] group-hover:bg-[#1b5e3b]',
+            'w-2 h-2 rounded-full shrink-0 transition-colors',
+            'bg-primary group-hover:bg-primary',
           )} />
         )}
-        {isHeld && <div className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />}
-        {isBooked && <div className="w-2 h-2 rounded-full bg-gray-300 flex-shrink-0" />}
-        {isPast && <div className="w-2 h-2 rounded-full bg-gray-200 flex-shrink-0" />}
+        {isHeld && <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />}
+        {isBooked && <div className="w-2 h-2 rounded-full bg-gray-300 shrink-0" />}
+        {isPast && <div className="w-2 h-2 rounded-full bg-gray-200 shrink-0" />}
 
         <span className={cn(
           'text-base font-bold',
-          isAvailable ? 'text-[#191c19]' : 'text-[#9aab9a]',
+          isAvailable ? 'text-on-surface' : 'text-[#9aab9a]',
         )}>
           {formatTime(slot.slotStart)}
-          <span className={cn('text-sm font-normal ml-1', isAvailable ? 'text-[#404942]' : 'text-[#bfc9bf]')}>
+          <span className={cn('text-sm font-normal ml-1', isAvailable ? 'text-on-surface-muted' : 'text-outline-variant')}>
             – {formatTime(slot.slotEnd)}
           </span>
         </span>
@@ -53,8 +53,8 @@ export function SlotCell({ slot, selected, onClick }: Props) {
       <div className="flex items-center gap-3">
         {isAvailable && (
           <>
-            <span className="text-sm font-semibold text-[#404942]">{formatPrice(slot.price)}</span>
-            <span className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-white bg-[#1b5e3b] px-3.5 py-1.5 rounded-lg group-hover:bg-[#004527] transition-colors">
+            <span className="text-sm font-semibold text-on-surface-muted">{formatPrice(slot.price)}</span>
+            <span className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-white bg-primary px-3.5 py-1.5 rounded-lg group-hover:bg-primary-dark transition-colors">
               Book
               <svg viewBox="0 0 12 12" fill="currentColor" className="w-2.5 h-2.5">
                 <path d="M1 6h10M6.5 1.5L11 6l-4.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />

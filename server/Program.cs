@@ -69,7 +69,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 
-    if (app.Environment.IsDevelopment() && !db.Courts.Any())
+    if (app.Environment.IsDevelopment() && !db.Courts.Any(c => c.Active))
     {
         var court1Id = Guid.NewGuid();
         var court2Id = Guid.NewGuid();
@@ -128,7 +128,9 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseHangfireDashboard("/hangfire");
+// Dashboard is dev-only: Hangfire's default filter would otherwise expose it publicly
+if (app.Environment.IsDevelopment())
+    app.UseHangfireDashboard("/hangfire");
 
 // Register recurring jobs
 RecurringJob.AddOrUpdate<SweepExpiredHoldsJob>(

@@ -15,6 +15,7 @@ import { AdminCourts } from './pages/admin/AdminCourts';
 import { AdminPricing } from './pages/admin/AdminPricing';
 import { AdminBlackouts } from './pages/admin/AdminBlackouts';
 import { AdminBookings } from './pages/admin/AdminBookings';
+import { NotFound } from './pages/NotFound';
 
 function TokenSyncer() {
   const { getToken } = useAuth();
@@ -48,6 +49,8 @@ function AppShell() {
           <Route path="/admin/blackouts" element={<AdminBlackouts />} />
           <Route path="/admin/bookings" element={<AdminBookings />} />
         </Route>
+
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );

@@ -69,7 +69,7 @@ A booking that covers 2 or more consecutive slots on the same court on the same 
 _Avoid_: multi-slot booking, session booking, extended booking
 
 **Booking**:
-A confirmed, paid reservation. Only exists after a `payment_succeeded` Stripe webhook. Stores `amount_charged` immutably.
+A confirmed reservation. Exists only after payment is settled — either a `payment_succeeded` Stripe webhook (cash checkout) or a Package redemption (no new Stripe charge). Stores `amount_charged` immutably.
 _Avoid_: reservation, appointment, confirmed slot
 
 **Booking state**:
@@ -79,6 +79,16 @@ _Avoid_: status, booking status
 **Cancellation window**:
 The admin-configured period before a slot start within which a user may cancel for a full refund. Outside this window, no refund is issued.
 _Avoid_: refund window, cancellation period
+
+### Packages
+
+**Package**:
+A pre-paid bundle of court sessions purchased upfront via a single Stripe charge, at a flat price per session valid on any court. Tracks `remaining_sessions` and `expires_at`. A User may hold multiple active Packages at once.
+_Avoid_: bundle, credit pack, punch card
+
+**Package session / redemption**:
+One unit of a Package, consumed to create a Booking without a new Stripe charge. Always corresponds to a single default-duration (60-min, 2-slot) booking — Packages do not cover 90/120-min block bookings, which must be paid individually via Stripe.
+_Avoid_: credit, redemption unit, session slot
 
 ### Pricing
 

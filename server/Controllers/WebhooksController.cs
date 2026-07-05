@@ -8,7 +8,7 @@ namespace TennisBooking.Controllers;
 
 [ApiController]
 [Route("api/webhooks")]
-public class WebhooksController(BookingService bookingService, EmailService emailService, AppDbContext db, IConfiguration config) : ControllerBase
+public class WebhooksController(BookingService bookingService, EmailService emailService, StripeRefundService refundService, AppDbContext db, IConfiguration config) : ControllerBase
 {
     [HttpPost("stripe")]
     public async Task<IActionResult> Stripe()
@@ -44,7 +44,10 @@ public class WebhooksController(BookingService bookingService, EmailService emai
                 }
                 catch (KeyNotFoundException)
                 {
-                    // Hold already expired or processed — idempotent
+                    // Hold expired before payment settled — no booking exists, so
+                    // refund the charge instead of silently keeping the money.
+                    if (!string.IsNullOrEmpty(session.PaymentIntentId))
+                        await refundService.RefundFullAsync(session.PaymentIntentId);
                 }
             }
         }

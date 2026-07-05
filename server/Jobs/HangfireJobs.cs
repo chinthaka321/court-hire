@@ -25,9 +25,10 @@ public class SendReminderEmailsJob(AppDbContext db, EmailService email, IConfigu
     {
         var hoursBefore = config.GetSection("Booking").Get<BookingSettings>()?.ReminderHoursBefore ?? 24;
 
-        // Window exactly matches job interval (15 min) to avoid duplicate sends
-        var windowStart = DateTime.UtcNow.AddHours(hoursBefore);
-        var windowEnd = windowStart.AddMinutes(15);
+        // Any not-yet-reminded booking starting within the reminder horizon.
+        // ReminderSent prevents duplicates, so a delayed job run can't skip bookings.
+        var now = DateTime.UtcNow;
+        var cutoff = now.AddHours(hoursBefore);
 
         var upcoming = await db.Bookings
             .Include(b => b.User)
@@ -35,7 +36,7 @@ public class SendReminderEmailsJob(AppDbContext db, EmailService email, IConfigu
             .Where(b =>
                 b.State == BookingState.Completed &&
                 !b.ReminderSent &&
-                b.SlotStarts.Any(s => s >= windowStart && s <= windowEnd))
+                b.SlotStarts.Any(s => s > now && s <= cutoff))
             .ToListAsync();
 
         foreach (var booking in upcoming)

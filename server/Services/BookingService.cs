@@ -28,40 +28,16 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
             .FirstOrDefaultAsync(c => c.Id == courtId && c.Active)
             ?? throw new KeyNotFoundException("Court not found");
 
-        var now = DateTime.UtcNow;
-        if (slotStart <= now)
-            throw new InvalidOperationException("Cannot book a past slot");
-
-        if (slotStart > now.AddDays(Settings.BookingHorizonDays))
-            throw new InvalidOperationException("Slot is beyond booking horizon");
-
         var slotStarts = Enumerable.Range(0, slotCount)
             .Select(i => slotStart.AddMinutes(i * court.SlotLengthMinutes))
             .ToList();
 
-        var slotStartsSet = slotStarts.ToHashSet();
-
-        // Check existing holds — one row per slot so no expansion needed
-        var heldSlots = await db.Holds
-            .Where(h => h.CourtId == courtId && h.ExpiresAt > now)
-            .Select(h => h.SlotStart)
-            .ToListAsync();
-
-        if (heldSlots.Any(s => slotStartsSet.Contains(s)))
-            throw new InvalidOperationException("Slot is no longer available");
-
-        // Check confirmed bookings (stored as arrays, so must check in memory)
-        var bookedSlotArrays = await db.Bookings
-            .Where(bk => bk.CourtId == courtId && bk.State != BookingState.Cancelled)
-            .Select(bk => bk.SlotStarts)
-            .ToListAsync();
-
-        if (bookedSlotArrays.SelectMany(ss => ss).Any(s => slotStartsSet.Contains(s)))
-            throw new InvalidOperationException("Slot is no longer available");
+        await EnsureSlotsBookableAsync(court, slotStarts);
 
         // Create one Hold row per slot, all sharing the same HoldGroupId.
         // The DB UNIQUE(CourtId, SlotStart) constraint is the concurrency backstop.
         var holdGroupId = Guid.NewGuid();
+        var expiresAt = DateTime.UtcNow.AddMinutes(Settings.HoldTtlMinutes);
         var totalPrice = 0m;
 
         foreach (var slot in slotStarts)
@@ -76,7 +52,7 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
                 SlotStart = slot,
                 UserId = userId,
                 CapturedPrice = price,
-                ExpiresAt = now.AddMinutes(Settings.HoldTtlMinutes)
+                ExpiresAt = expiresAt
             });
         }
 
@@ -84,8 +60,12 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
         return new HoldGroup(holdGroupId, totalPrice, slotCount * court.SlotLengthMinutes);
     }
 
-    public async Task<Booking> ConfirmBookingAsync(string stripePaymentIntentId, Guid holdGroupId)
+    public async Task<Booking> ConfirmBookingAsync(string? stripePaymentIntentId, Guid holdGroupId)
     {
+        // Idempotent: the Stripe webhook and the dev mock flow can both fire for the same group.
+        var existing = await db.Bookings.FirstOrDefaultAsync(b => b.HoldGroupId == holdGroupId);
+        if (existing is not null) return existing;
+
         var holds = await db.Holds
             .Where(h => h.HoldGroupId == holdGroupId)
             .OrderBy(h => h.SlotStart)
@@ -97,6 +77,7 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
         var booking = new Booking
         {
             Id = Guid.NewGuid(),
+            HoldGroupId = holdGroupId,
             CourtId = first.CourtId,
             SlotStarts = holds.Select(h => h.SlotStart).ToList(),
             UserId = first.UserId,
@@ -126,10 +107,10 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
             throw new InvalidOperationException("Booking is not in a cancellable state");
 
         var earliestSlot = booking.SlotStarts.Min();
-        var withinWindow = isAdmin || DateTime.UtcNow <= earliestSlot.AddHours(-Settings.CancellationWindowHours);
+        var withinWindow = DateTime.UtcNow <= earliestSlot.AddHours(-Settings.CancellationWindowHours);
 
-        if (!withinWindow && !isAdmin)
-            throw new InvalidOperationException("Cancellation window has passed — no refund will be issued");
+        if (!isAdmin && !withinWindow)
+            throw new InvalidOperationException("The cancellation window has passed — this booking can no longer be cancelled");
 
         booking.State = BookingState.Cancelled;
         await db.SaveChangesAsync();
@@ -145,6 +126,9 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
         await db.SaveChangesAsync();
     }
 
+    // ADR-0004: reschedule moves the entire N-slot span as a unit — same court, same
+    // slot count, new contiguous start — and only when the new span's total price
+    // equals AmountCharged. No money moves.
     public async Task RescheduleBookingAsync(Guid bookingId, DateTime newSlotStart, string requestingUserId)
     {
         var booking = await db.Bookings
@@ -159,22 +143,67 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
         if (booking.State != BookingState.Completed)
             throw new InvalidOperationException("Only completed bookings can be rescheduled");
 
-        var newPrice = pricing.GetPrice(booking.Court, newSlotStart);
-        if (newPrice != booking.AmountCharged)
-            throw new InvalidOperationException("Price differs — please cancel and rebook");
+        var court = booking.Court;
+        var newSlotStarts = Enumerable.Range(0, booking.SlotStarts.Count)
+            .Select(i => newSlotStart.AddMinutes(i * court.SlotLengthMinutes))
+            .ToList();
 
-        var now = DateTime.UtcNow;
-        var conflict = await db.Bookings.AnyAsync(bk =>
-            bk.CourtId == booking.CourtId && bk.SlotStarts.Contains(newSlotStart) &&
-            bk.State != BookingState.Cancelled && bk.Id != bookingId);
+        var newTotal = newSlotStarts.Sum(s => pricing.GetPrice(court, s));
+        if (newTotal != booking.AmountCharged)
+            throw new InvalidOperationException("The new time costs a different amount — please cancel and rebook instead");
 
-        var holdConflict = await db.Holds.AnyAsync(h =>
-            h.CourtId == booking.CourtId && h.SlotStart == newSlotStart && h.ExpiresAt > now);
+        await EnsureSlotsBookableAsync(court, newSlotStarts, excludeBookingId: booking.Id);
 
-        if (conflict || holdConflict)
-            throw new InvalidOperationException("New slot is not available");
-
-        booking.SlotStarts = [newSlotStart];
+        booking.SlotStarts = newSlotStarts;
         await db.SaveChangesAsync();
+    }
+
+    private async Task EnsureSlotsBookableAsync(Court court, List<DateTime> slotStarts, Guid? excludeBookingId = null)
+    {
+        var now = DateTime.UtcNow;
+        var first = slotStarts[0];
+        var lastEnd = slotStarts[^1].AddMinutes(court.SlotLengthMinutes);
+
+        if (first <= now)
+            throw new InvalidOperationException("Cannot book a past slot");
+
+        if (first > now.AddDays(Settings.BookingHorizonDays))
+            throw new InvalidOperationException("Slot is beyond the booking horizon");
+
+        var day = DateOnly.FromDateTime(first);
+        var open = day.ToDateTime(court.OpeningHours.Open, DateTimeKind.Utc);
+        var close = day.ToDateTime(court.OpeningHours.Close, DateTimeKind.Utc);
+
+        if (first < open || lastEnd > close)
+            throw new InvalidOperationException("Slot is outside the court's opening hours");
+
+        if ((int)(first - open).TotalMinutes % court.SlotLengthMinutes != 0)
+            throw new InvalidOperationException("Slot is not aligned to the court's time grid");
+
+        var slotSet = slotStarts.ToHashSet();
+
+        var heldSlots = await db.Holds
+            .Where(h => h.CourtId == court.Id && h.ExpiresAt > now)
+            .Select(h => h.SlotStart)
+            .ToListAsync();
+
+        if (heldSlots.Any(slotSet.Contains))
+            throw new InvalidOperationException("Slot is no longer available");
+
+        // Bookings store slots as arrays, so overlap is checked in memory
+        var bookedSlotArrays = await db.Bookings
+            .Where(b => b.CourtId == court.Id && b.State != BookingState.Cancelled
+                        && (excludeBookingId == null || b.Id != excludeBookingId))
+            .Select(b => b.SlotStarts)
+            .ToListAsync();
+
+        if (bookedSlotArrays.SelectMany(s => s).Any(slotSet.Contains))
+            throw new InvalidOperationException("Slot is no longer available");
+
+        var blackedOut = await db.Blackouts
+            .AnyAsync(bl => bl.CourtId == court.Id && bl.Start < lastEnd && bl.End > first);
+
+        if (blackedOut)
+            throw new InvalidOperationException("The court is unavailable during this time");
     }
 }

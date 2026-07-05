@@ -4,7 +4,7 @@ namespace TennisBooking.Services;
 
 public class PricingService
 {
-    public decimal GetPrice(Court court, DateTime slotStart)
+    public decimal? TryGetPrice(Court court, DateTime slotStart)
     {
         var dayType = slotStart.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday
             ? DayType.Weekend
@@ -15,7 +15,11 @@ public class PricingService
             : PriceBand.Day;
 
         return court.PriceRates
-            .First(r => r.DayType == dayType && r.Band == band)
-            .Price;
+            .FirstOrDefault(r => r.DayType == dayType && r.Band == band)
+            ?.Price;
     }
+
+    public decimal GetPrice(Court court, DateTime slotStart) =>
+        TryGetPrice(court, slotStart)
+        ?? throw new InvalidOperationException("No price is configured for this court and time");
 }

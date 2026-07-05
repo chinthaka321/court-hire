@@ -32,16 +32,13 @@ public class BookingsController(AppDbContext db, BookingService bookingService, 
     [HttpGet("by-hold-group/{holdGroupId:guid}")]
     public async Task<IActionResult> ByHoldGroup(Guid holdGroupId)
     {
-        var holdStillExists = await db.Holds.AnyAsync(h => h.HoldGroupId == holdGroupId);
-        if (holdStillExists) return Ok(new { status = "pending" });
-
         var booking = await db.Bookings
-            .Where(b => b.UserId == UserId)
-            .OrderByDescending(b => b.CreatedAt)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(b => b.HoldGroupId == holdGroupId && b.UserId == UserId);
+        if (booking is not null)
+            return Ok(new { status = "confirmed", bookingId = booking.Id });
 
-        if (booking is null) return Ok(new { status = "pending" });
-        return Ok(new { status = "confirmed", bookingId = booking.Id });
+        var holdStillExists = await db.Holds.AnyAsync(h => h.HoldGroupId == holdGroupId);
+        return Ok(new { status = holdStillExists ? "pending" : "expired" });
     }
 
     [HttpDelete("{id:guid}")]
@@ -60,7 +57,10 @@ public class BookingsController(AppDbContext db, BookingService bookingService, 
             await bookingService.CancelBookingAsync(id, UserId);
 
             if (!string.IsNullOrEmpty(booking.StripePaymentIntentId))
-                await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
+            {
+                booking.StripeRefundId = await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
+                await db.SaveChangesAsync();
+            }
 
             await emailService.SendBookingCancelledAsync(booking);
 
@@ -87,6 +87,14 @@ public class BookingsController(AppDbContext db, BookingService bookingService, 
         catch (InvalidOperationException ex)
         {
             return Conflict(new { error = ex.Message });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
         }
     }
 }

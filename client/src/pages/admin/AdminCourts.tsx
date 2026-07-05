@@ -13,12 +13,12 @@ interface CourtForm {
 
 const blank: CourtForm = { name: '', open: '07:00', close: '22:00', slotLengthMinutes: 30, dayNightBoundary: '18:00' };
 
-const inputCls = 'w-full border border-[#bfc9bf] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#1b5e3b] bg-white';
+const inputCls = 'w-full border border-outline-variant rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary bg-white';
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-[#404942] mb-1">{label}</label>
+      <label className="block text-xs font-medium text-on-surface-muted mb-1">{label}</label>
       {children}
     </div>
   );
@@ -80,13 +80,13 @@ export function AdminCourts() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#191c19]">Courts</h1>
-          <p className="text-sm text-[#404942] mt-0.5">Configure hours, slot length, and pricing boundaries</p>
+          <h1 className="text-2xl font-bold text-on-surface">Courts</h1>
+          <p className="text-sm text-on-surface-muted mt-0.5">Configure hours, slot length, and pricing boundaries</p>
         </div>
         {!showForm && (
           <button
             onClick={() => { setEditing(null); setForm(blank); setShowForm(true); }}
-            className="text-sm font-semibold text-white bg-[#1b5e3b] px-4 py-2 rounded-lg hover:bg-[#004527] transition-colors"
+            className="text-sm font-semibold text-white bg-primary px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors"
           >
             + Add Court
           </button>
@@ -95,8 +95,8 @@ export function AdminCourts() {
 
       {/* Add / Edit form */}
       {showForm && (
-        <div className="bg-white rounded-xl border border-[#e6e9e4] p-5 mb-5">
-          <h2 className="font-semibold text-[#191c19] mb-4">{editing ? 'Edit Court' : 'New Court'}</h2>
+        <div className="bg-white rounded-xl border border-surface-high p-5 mb-5">
+          <h2 className="font-semibold text-on-surface mb-4">{editing ? 'Edit Court' : 'New Court'}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <Field label="Court Name">
@@ -117,26 +117,26 @@ export function AdminCourts() {
                 onChange={e => setForm(f => ({ ...f, close: e.target.value }))} />
             </Field>
             <Field label="Slot length (minutes)">
-              <div className={`${inputCls} text-[#404942] bg-[#f8faf5] cursor-not-allowed`}>
+              <div className={`${inputCls} text-on-surface-muted bg-surface cursor-not-allowed`}>
                 30 min — fixed base unit (customers choose 60 / 90 / 120 when booking)
               </div>
             </Field>
             <Field label="Day / Night boundary">
               <input type="time" className={inputCls} value={form.dayNightBoundary}
                 onChange={e => setForm(f => ({ ...f, dayNightBoundary: e.target.value }))} />
-              <p className="text-[11px] text-[#404942] mt-1">Splits day vs. night pricing</p>
+              <p className="text-[11px] text-on-surface-muted mt-1">Splits day vs. night pricing</p>
             </Field>
           </div>
           <div className="flex gap-3 mt-5">
             <button
               onClick={() => saveMutation.mutate()}
               disabled={saveMutation.isPending || !form.name.trim()}
-              className="bg-[#1b5e3b] text-white text-sm font-semibold px-5 py-2 rounded-lg disabled:opacity-50 hover:bg-[#004527] transition-colors"
+              className="bg-primary text-white text-sm font-semibold px-5 py-2 rounded-lg disabled:opacity-50 hover:bg-primary-dark transition-colors"
             >
               {saveMutation.isPending ? 'Saving…' : 'Save Court'}
             </button>
             <button onClick={cancelForm}
-              className="text-sm font-medium text-[#404942] px-5 py-2 rounded-lg border border-[#bfc9bf] hover:bg-gray-50 transition-colors">
+              className="text-sm font-medium text-on-surface-muted px-5 py-2 rounded-lg border border-outline-variant hover:bg-gray-50 transition-colors">
               Cancel
             </button>
           </div>
@@ -148,7 +148,7 @@ export function AdminCourts() {
 
       {/* Active courts */}
       {courts.length === 0 ? (
-        <div className="text-center py-16 text-sm text-[#404942]">
+        <div className="text-center py-16 text-sm text-on-surface-muted">
           No courts yet. Add your first court above.
         </div>
       ) : (
@@ -205,12 +205,12 @@ function CourtCard({
   return (
     <div className={`bg-white rounded-xl border p-5 transition-colors ${
       court.active
-        ? 'border-[#e6e9e4] hover:border-[#1b5e3b]/40'
+        ? 'border-surface-high hover:border-primary/40'
         : 'border-[#f0f0f0] opacity-70'
     }`}>
       <div className="flex items-start justify-between mb-3">
         <div>
-          <p className="font-semibold text-[#191c19] text-base">{court.name}</p>
+          <p className="font-semibold text-on-surface text-base">{court.name}</p>
           {court.active ? (
             <p className="text-xs text-green-700 bg-green-50 rounded-full px-2 py-0.5 inline-block mt-1">Active</p>
           ) : (
@@ -219,7 +219,7 @@ function CourtCard({
         </div>
         <button
           onClick={onEdit}
-          className="text-xs font-medium text-[#1b5e3b] border border-[#1b5e3b] rounded-lg px-3 py-1.5 hover:bg-[#e8f5ee] transition-colors"
+          className="text-xs font-medium text-primary border border-primary rounded-lg px-3 py-1.5 hover:bg-primary-light transition-colors"
         >
           Edit
         </button>
@@ -227,14 +227,14 @@ function CourtCard({
 
       <div className="space-y-2 text-sm mb-4">
         <div className="flex justify-between">
-          <span className="text-[#404942]">Hours</span>
-          <span className="font-medium text-[#191c19]">
+          <span className="text-on-surface-muted">Hours</span>
+          <span className="font-medium text-on-surface">
             {court.openingHours.open.slice(0, 5)} – {court.openingHours.close.slice(0, 5)}
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-[#404942]">Day/Night split</span>
-          <span className="font-medium text-[#191c19]">{court.dayNightBoundary.slice(0, 5)}</span>
+          <span className="text-on-surface-muted">Day/Night split</span>
+          <span className="font-medium text-on-surface">{court.dayNightBoundary.slice(0, 5)}</span>
         </div>
       </div>
 
@@ -250,7 +250,7 @@ function CourtCard({
         <button
           onClick={onToggle}
           disabled={toggling}
-          className="w-full text-xs font-medium text-[#1b5e3b] border border-[#1b5e3b] rounded-lg px-3 py-1.5 hover:bg-[#e8f5ee] transition-colors disabled:opacity-50"
+          className="w-full text-xs font-medium text-primary border border-primary rounded-lg px-3 py-1.5 hover:bg-primary-light transition-colors disabled:opacity-50"
         >
           Reactivate
         </button>

@@ -32,6 +32,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .Property(bk => bk.SlotStarts)
             .HasColumnType("timestamp with time zone[]");
 
+        b.Entity<Booking>()
+            .HasIndex(bk => bk.HoldGroupId);
+
         // Prevent double-booking: unique (court_id, slot_start) enforced at DB level
         // via application-layer check + Hold unique index as backstop.
         // Full cross-table enforcement is done via a DB trigger in migration.

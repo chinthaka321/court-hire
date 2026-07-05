@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useUser } from '@clerk/clerk-react';
-import { getMyBookings, cancelBooking } from '../lib/api';
+import { useUser, SignInButton } from '@clerk/clerk-react';
+import { getMyBookings, cancelBooking, apiErrorMessage } from '../lib/api';
 import { BookingCard } from '../components/BookingCard';
 import type { Booking } from '../types';
 
@@ -24,15 +24,25 @@ export function MyBookings() {
       queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
       setCancelError(null);
     },
-    onError: (e: any) => {
-      setCancelError(e.response?.data?.error ?? 'Failed to cancel booking');
+    onError: (e: unknown) => {
+      setCancelError(apiErrorMessage(e, 'Failed to cancel booking'));
     },
   });
 
   if (!isLoaded) return null;
+
   if (!user) {
-    navigate('/login');
-    return null;
+    return (
+      <div className="max-w-md mx-auto px-4 pt-24 text-center">
+        <h1 className="text-xl font-bold text-on-surface">Sign in to view your bookings</h1>
+        <p className="text-sm text-on-surface-muted mt-2 mb-6">Your upcoming and past reservations live here.</p>
+        <SignInButton mode="modal">
+          <button className="bg-primary text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-primary-dark transition-colors">
+            Sign In
+          </button>
+        </SignInButton>
+      </div>
+    );
   }
 
   const upcoming = bookings.filter(b =>
@@ -45,8 +55,8 @@ export function MyBookings() {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 pb-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#191c19]">My Bookings</h1>
-        <p className="text-sm text-[#404942] mt-0.5">Your upcoming and past court reservations</p>
+        <h1 className="text-2xl font-bold text-on-surface">My Bookings</h1>
+        <p className="text-sm text-on-surface-muted mt-0.5">Your upcoming and past court reservations</p>
       </div>
 
       {cancelError && (
@@ -56,14 +66,14 @@ export function MyBookings() {
       )}
 
       {isLoading ? (
-        <div className="text-center text-sm text-[#404942] py-16">Loading…</div>
+        <div className="text-center text-sm text-on-surface-muted py-16">Loading…</div>
       ) : bookings.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-xl border border-[#e6e9e4]">
-          <p className="text-[#191c19] font-medium">No bookings yet</p>
-          <p className="text-sm text-[#404942] mt-1">Book a court to get started</p>
+        <div className="text-center py-20 bg-white rounded-xl border border-surface-high">
+          <p className="text-on-surface font-medium">No bookings yet</p>
+          <p className="text-sm text-on-surface-muted mt-1">Book a court to get started</p>
           <button
             onClick={() => navigate('/')}
-            className="mt-5 bg-[#1b5e3b] text-white text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-[#004527] transition-colors"
+            className="mt-5 bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-primary-dark transition-colors"
           >
             Book a Court
           </button>
@@ -72,7 +82,7 @@ export function MyBookings() {
         <div className="space-y-8">
           {upcoming.length > 0 && (
             <section>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#404942] mb-3">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-muted mb-3">
                 Upcoming ({upcoming.length})
               </p>
               <div className="flex flex-col gap-3">
@@ -94,7 +104,7 @@ export function MyBookings() {
 
           {past.length > 0 && (
             <section>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-[#404942] mb-3">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-muted mb-3">
                 Past ({past.length})
               </p>
               <div className="flex flex-col gap-3">

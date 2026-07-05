@@ -9,7 +9,7 @@ namespace TennisBooking.Controllers;
 [ApiController]
 [Route("api/holds")]
 [Authorize]
-public class HoldsController(BookingService booking, IConfiguration config) : ControllerBase
+public class HoldsController(BookingService booking, IConfiguration config, IWebHostEnvironment env) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateHoldRequest req)
@@ -20,6 +20,12 @@ public class HoldsController(BookingService booking, IConfiguration config) : Co
         try
         {
             var holdGroup = await booking.CreateHoldAsync(req.CourtId, req.SlotStart.ToUniversalTime(), userId, req.SlotCount);
+
+            if (env.IsDevelopment() && config.GetValue<bool>("App:MockPayment"))
+            {
+                var mockUrl = $"{Request.Scheme}://{Request.Host}/api/dev/mock-payment?holdGroupId={holdGroup.HoldGroupId}";
+                return Ok(new { checkoutUrl = mockUrl, holdGroupId = holdGroup.HoldGroupId });
+            }
 
             var options = new SessionCreateOptions
             {
@@ -53,6 +59,15 @@ public class HoldsController(BookingService booking, IConfiguration config) : Co
         catch (InvalidOperationException ex)
         {
             return Conflict(new { error = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException)
+        {
+            // Lost the race on UNIQUE(CourtId, SlotStart) — someone held the slot first
+            return Conflict(new { error = "Slot is no longer available" });
         }
     }
 }

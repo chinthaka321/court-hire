@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@clerk/clerk-react';
-import { getCourts, getAvailability } from '../lib/api';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth, useClerk } from '@clerk/clerk-react';
+import { getCourts, getAvailability, getMyBookings, rescheduleBooking, apiErrorMessage } from '../lib/api';
 import { DatePicker } from '../components/DatePicker';
 import { SlotCell } from '../components/SlotCell';
-import type { Court, SlotInfo, SlotStatus } from '../types';
-import { toDateOnlyString } from '../lib/utils';
+import type { Booking, Court, SlotInfo, SlotStatus } from '../types';
+import { toDateOnlyString, formatPrice, formatDateTime } from '../lib/utils';
 import { isToday, format } from 'date-fns';
 
 const DURATIONS = [60, 90, 120] as const;
@@ -23,7 +23,7 @@ function baseSlotLen(slots: SlotInfo[]): number {
   );
 }
 
-function groupSlots(slots: SlotInfo[], durationMinutes: Duration): DisplaySlot[] {
+function groupSlots(slots: SlotInfo[], durationMinutes: number): DisplaySlot[] {
   const base = baseSlotLen(slots);
   const n = Math.max(1, Math.round(durationMinutes / base));
   const result: DisplaySlot[] = [];
@@ -54,16 +54,36 @@ export function BookingCalendar() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
   const [duration, setDuration] = useState<Duration>(60);
+  const [rescheduleError, setRescheduleError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isSignedIn } = useAuth();
+  const { openSignIn } = useClerk();
+
+  const [searchParams] = useSearchParams();
+  const rescheduleId = searchParams.get('reschedule');
 
   const { data: courts = [] } = useQuery<Court[]>({
     queryKey: ['courts'],
     queryFn: getCourts,
   });
 
-  const activeCourt = selectedCourtId ?? courts[0]?.id ?? null;
+  // Reschedule mode: the booking being moved locks the court and duration
+  // (same court, same slot count, same total price — see ADR-0004).
+  const { data: myBookings = [] } = useQuery<Booking[]>({
+    queryKey: ['my-bookings'],
+    queryFn: getMyBookings,
+    enabled: !!rescheduleId && !!isSignedIn,
+  });
+  const rescheduling = rescheduleId
+    ? myBookings.find(b => b.id === rescheduleId) ?? null
+    : null;
+
+  const activeCourt = rescheduling?.court.id ?? selectedCourtId ?? courts[0]?.id ?? null;
   const activeCourtObj = courts.find(c => c.id === activeCourt);
+  const activeDuration = rescheduling
+    ? rescheduling.slotStarts.length * (activeCourtObj?.slotLengthMinutes ?? 30)
+    : duration;
 
   const { data: rawSlots = [], isLoading } = useQuery<SlotInfo[]>({
     queryKey: ['availability', activeCourt, toDateOnlyString(selectedDate)],
@@ -71,12 +91,29 @@ export function BookingCalendar() {
     enabled: !!activeCourt,
   });
 
-  const slots = groupSlots(rawSlots, duration);
-  const availableCount = slots.filter(s => s.status === 'Available').length;
+  const rescheduleMutation = useMutation({
+    mutationFn: (newSlotStart: string) => rescheduleBooking(rescheduleId!, newSlotStart),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['availability'] });
+      navigate('/my-bookings');
+    },
+    onError: (e: unknown) => {
+      setRescheduleError(apiErrorMessage(e, 'Could not reschedule to that time.'));
+    },
+  });
+
+  const slots = groupSlots(rawSlots, activeDuration);
+  const availableSlots = slots.filter(s => s.status === 'Available');
 
   function handleSlotTap(slot: DisplaySlot) {
     if (!isSignedIn) {
-      navigate('/login');
+      openSignIn();
+      return;
+    }
+    if (rescheduling) {
+      setRescheduleError(null);
+      rescheduleMutation.mutate(slot.slotStart);
       return;
     }
     navigate(
@@ -89,13 +126,17 @@ export function BookingCalendar() {
     : format(selectedDate, 'EEE, MMM d');
 
   return (
-    <div className="min-h-screen bg-[#f8faf5]">
+    <div className="min-h-screen bg-surface">
       {/* Hero header */}
-      <div className="bg-white border-b border-[#e6e9e4]">
+      <div className="bg-white border-b border-surface-high">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#191c19]">Book a Court</h1>
-          <p className="text-sm text-[#404942] mt-1">
-            Pick a date, choose a court, tap a slot.
+          <h1 className="text-2xl sm:text-3xl font-bold text-on-surface">
+            {rescheduling ? 'Reschedule Booking' : 'Book a Court'}
+          </h1>
+          <p className="text-sm text-on-surface-muted mt-1">
+            {rescheduling
+              ? 'Pick a new start time for your booking.'
+              : 'Pick a date, choose a court, tap a slot.'}
           </p>
         </div>
 
@@ -106,17 +147,39 @@ export function BookingCalendar() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5">
-        {/* Court tabs */}
-        {courts.length > 1 && (
+        {/* Reschedule banner */}
+        {rescheduling && (
+          <div className="bg-primary-light border border-primary/20 rounded-xl px-4 py-3 mb-5 text-sm text-on-surface">
+            <p>
+              Moving your <span className="font-semibold">{rescheduling.court.name}</span> booking
+              on {formatDateTime(rescheduling.slotStarts[0])} ({activeDuration} min).
+            </p>
+            <p className="text-xs text-on-surface-muted mt-1">
+              The new time must cost the same ({formatPrice(rescheduling.amountCharged)}) — otherwise cancel and rebook.{' '}
+              <button onClick={() => navigate('/my-bookings')} className="text-primary font-medium underline">
+                Keep current time
+              </button>
+            </p>
+          </div>
+        )}
+
+        {rescheduleError && (
+          <div className="mb-5 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+            {rescheduleError}
+          </div>
+        )}
+
+        {/* Court tabs — hidden while rescheduling (same-court swap only) */}
+        {!rescheduling && courts.length > 1 && (
           <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
             {courts.map(court => (
               <button
                 key={court.id}
                 onClick={() => setSelectedCourtId(court.id)}
-                className={`flex-shrink-0 text-sm font-semibold px-4 py-2 rounded-full border transition-all ${
+                className={`shrink-0 text-sm font-semibold px-4 py-2 rounded-full border transition-all ${
                   activeCourt === court.id
-                    ? 'bg-[#1b5e3b] text-white border-[#1b5e3b] shadow-sm'
-                    : 'bg-white text-[#404942] border-[#e6e9e4] hover:border-[#1b5e3b] hover:text-[#191c19]'
+                    ? 'bg-primary text-white border-primary shadow-sm'
+                    : 'bg-white text-on-surface-muted border-surface-high hover:border-primary hover:text-on-surface'
                 }`}
               >
                 {court.name}
@@ -125,59 +188,61 @@ export function BookingCalendar() {
           </div>
         )}
 
-        {/* Duration selector */}
-        <div className="flex items-center gap-2 mb-5">
-          <span className="text-xs font-medium text-[#404942] mr-1">Duration</span>
-          {DURATIONS.map(d => (
-            <button
-              key={d}
-              onClick={() => setDuration(d)}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-all ${
-                duration === d
-                  ? 'bg-[#1b5e3b] text-white border-[#1b5e3b] shadow-sm'
-                  : 'bg-white text-[#404942] border-[#e6e9e4] hover:border-[#1b5e3b] hover:text-[#191c19]'
-              }`}
-            >
-              {d} min
-            </button>
-          ))}
-        </div>
+        {/* Duration selector — fixed while rescheduling */}
+        {!rescheduling && (
+          <div className="flex items-center gap-2 mb-5">
+            <span className="text-xs font-medium text-on-surface-muted mr-1">Duration</span>
+            {DURATIONS.map(d => (
+              <button
+                key={d}
+                onClick={() => setDuration(d)}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-all ${
+                  duration === d
+                    ? 'bg-primary text-white border-primary shadow-sm'
+                    : 'bg-white text-on-surface-muted border-surface-high hover:border-primary hover:text-on-surface'
+                }`}
+              >
+                {d} min
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Selected date + availability summary */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
-            <h2 className="text-lg font-bold text-[#191c19]">{dateLabel}</h2>
-            {activeCourtObj && courts.length === 1 && (
-              <span className="text-sm text-[#404942]">· {activeCourtObj.name}</span>
+            <h2 className="text-lg font-bold text-on-surface">{dateLabel}</h2>
+            {activeCourtObj && (rescheduling || courts.length === 1) && (
+              <span className="text-sm text-on-surface-muted">· {activeCourtObj.name}</span>
             )}
           </div>
           {!isLoading && slots.length > 0 && (
             <span className={`text-sm font-semibold ${
-              availableCount > 0 ? 'text-[#1b5e3b]' : 'text-[#9aab9a]'
+              availableSlots.length > 0 ? 'text-primary' : 'text-[#9aab9a]'
             }`}>
-              {availableCount > 0 ? `${availableCount} open` : 'Fully booked'}
+              {availableSlots.length > 0 ? `${availableSlots.length} open` : 'Fully booked'}
             </span>
           )}
         </div>
 
         {/* Court info strip */}
         {activeCourtObj && (
-          <div className="flex items-center gap-4 mb-4 text-xs text-[#404942]">
+          <div className="flex items-center gap-4 mb-4 text-xs text-on-surface-muted">
             <span className="flex items-center gap-1">
-              <svg viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3 text-[#1b5e3b]">
+              <svg viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3 text-primary">
                 <path d="M8 3.5a.5.5 0 00-1 0V9a.5.5 0 00.252.434l3.5 2a.5.5 0 00.496-.868L8 8.71V3.5z"/>
                 <path d="M8 16A8 8 0 108 0a8 8 0 000 16zm7-8A7 7 0 111 8a7 7 0 0114 0z"/>
               </svg>
               {activeCourtObj.openingHours.open.slice(0, 5)} – {activeCourtObj.openingHours.close.slice(0, 5)}
             </span>
-            <span className="text-[#bfc9bf]">·</span>
-            <span>{duration} min session</span>
+            <span className="text-outline-variant">·</span>
+            <span>{activeDuration} min session</span>
           </div>
         )}
 
         {/* Slot list */}
-        <div className="bg-white rounded-2xl border border-[#e6e9e4] overflow-hidden shadow-sm">
-          {isLoading ? (
+        <div className="bg-white rounded-2xl border border-surface-high overflow-hidden shadow-sm">
+          {isLoading || rescheduleMutation.isPending ? (
             <div className="divide-y divide-[#f0f0f0]">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="flex items-center justify-between px-5 py-4 animate-pulse">
@@ -189,28 +254,20 @@ export function BookingCalendar() {
                 </div>
               ))}
             </div>
-          ) : slots.length === 0 ? (
+          ) : availableSlots.length === 0 ? (
             <div className="py-16 text-center">
-              <p className="text-base font-medium text-[#404942]">No slots available</p>
-              <p className="text-sm text-[#9aab9a] mt-1">Try a different date or court</p>
+              <p className="text-base font-medium text-on-surface-muted">No slots available</p>
+              <p className="text-sm text-[#9aab9a] mt-1">Try a different date{rescheduling ? '' : ' or court'}</p>
             </div>
           ) : (
             <div>
-              {slots
-                .filter(s => s.status === 'Available')
-                .map(slot => (
-                  <SlotCell
-                    key={slot.slotStart}
-                    slot={slot}
-                    onClick={() => handleSlotTap(slot)}
-                  />
-                ))}
-              {slots.filter(s => s.status === 'Available').length === 0 && (
-                <div className="py-16 text-center">
-                  <p className="text-base font-medium text-[#404942]">No slots available</p>
-                  <p className="text-sm text-[#9aab9a] mt-1">Try a different date or court</p>
-                </div>
-              )}
+              {availableSlots.map(slot => (
+                <SlotCell
+                  key={slot.slotStart}
+                  slot={slot}
+                  onClick={() => handleSlotTap(slot)}
+                />
+              ))}
             </div>
           )}
         </div>

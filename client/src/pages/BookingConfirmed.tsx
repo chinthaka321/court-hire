@@ -18,17 +18,17 @@ export function BookingConfirmed() {
   return (
     <div className="max-w-md mx-auto px-4 sm:px-6 py-12 text-center">
       {/* Success icon */}
-      <div className="w-20 h-20 bg-[#e8f5ee] rounded-full flex items-center justify-center mx-auto mb-5">
+      <div className="w-20 h-20 bg-primary-light rounded-full flex items-center justify-center mx-auto mb-5">
         <svg viewBox="0 0 24 24" fill="none" stroke="#1b5e3b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10">
           <polyline points="20 6 9 17 4 12" />
         </svg>
       </div>
 
-      <h1 className="text-2xl font-bold text-[#191c19]">Booking Confirmed!</h1>
-      <p className="text-sm text-[#404942] mt-2">A confirmation email has been sent to you.</p>
+      <h1 className="text-2xl font-bold text-on-surface">Booking Confirmed!</h1>
+      <p className="text-sm text-on-surface-muted mt-2">A confirmation email has been sent to you.</p>
 
       {booking && (
-        <div className="mt-8 bg-white rounded-2xl border border-[#e6e9e4] text-left divide-y divide-[#f0f0f0]">
+        <div className="mt-8 bg-white rounded-2xl border border-surface-high text-left divide-y divide-[#f0f0f0]">
           <Row label="Court"       value={booking.court.name} />
           <Row label="Date & Time" value={formatDateTime(booking.slotStarts[0])} />
           <Row label="Amount Paid" value={formatPrice(booking.amountCharged)} />
@@ -39,13 +39,13 @@ export function BookingConfirmed() {
       <div className="flex flex-col gap-3 mt-8">
         <button
           onClick={() => navigate('/my-bookings')}
-          className="w-full bg-[#1b5e3b] text-white font-semibold py-3 rounded-xl hover:bg-[#004527] transition-colors"
+          className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-dark transition-colors"
         >
           View My Bookings
         </button>
         <button
           onClick={() => navigate('/')}
-          className="w-full text-[#1b5e3b] font-medium py-3 rounded-xl border border-[#1b5e3b] hover:bg-[#e8f5ee] transition-colors"
+          className="w-full text-primary font-medium py-3 rounded-xl border border-primary hover:bg-primary-light transition-colors"
         >
           Book Another Court
         </button>
@@ -57,8 +57,8 @@ export function BookingConfirmed() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between px-5 py-3.5">
-      <span className="text-sm text-[#404942]">{label}</span>
-      <span className="text-sm font-semibold text-[#191c19]">{value}</span>
+      <span className="text-sm text-on-surface-muted">{label}</span>
+      <span className="text-sm font-semibold text-on-surface">{value}</span>
     </div>
   );
 }
