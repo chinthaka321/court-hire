@@ -39,6 +39,15 @@ public class CourtsController(AppDbContext db) : ControllerBase
     [HttpPost, Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> Create([FromBody] CreateCourtRequest req)
     {
+        if (string.IsNullOrWhiteSpace(req.Name))
+        {
+            return BadRequest(new { error = "Name is required." });
+        }
+        if (req.Close <= req.Open)
+        {
+            return BadRequest(new { error = "Close time must be after open time." });
+        }
+
         var court = new Court
         {
             Id = Guid.NewGuid(),
@@ -58,6 +67,15 @@ public class CourtsController(AppDbContext db) : ControllerBase
     [HttpPut("{id:guid}"), Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> Update(Guid id, [FromBody] CreateCourtRequest req)
     {
+        if (string.IsNullOrWhiteSpace(req.Name))
+        {
+            return BadRequest(new { error = "Name is required." });
+        }
+        if (req.Close <= req.Open)
+        {
+            return BadRequest(new { error = "Close time must be after open time." });
+        }
+
         var court = await db.Courts.FindAsync(id);
         if (court is null) return NotFound();
 

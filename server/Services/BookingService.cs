@@ -32,6 +32,18 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
             .Select(i => slotStart.AddMinutes(i * court.SlotLengthMinutes))
             .ToList();
 
+        // Clear any expired holds on these slots before verifying availability or inserting new holds.
+        // This prevents unique constraint violations from stale holds that haven't been swept yet.
+        var now = DateTime.UtcNow;
+        var expiredHolds = await db.Holds
+            .Where(h => h.CourtId == courtId && slotStarts.Contains(h.SlotStart) && h.ExpiresAt <= now)
+            .ToListAsync();
+        if (expiredHolds.Count > 0)
+        {
+            db.Holds.RemoveRange(expiredHolds);
+            await db.SaveChangesAsync();
+        }
+
         await EnsureSlotsBookableAsync(court, slotStarts);
 
         // Create one Hold row per slot, all sharing the same HoldGroupId.

@@ -35,6 +35,9 @@ export const getAvailability = (courtId: string, date: string) =>
 export const createHold = (courtId: string, slotStart: string, slotCount: number = 1) =>
   api.post('/holds', { courtId, slotStart, slotCount }).then(r => r.data);
 
+// Users
+export const getMe = () => api.get('/me').then(r => r.data);
+
 // Bookings
 export const getMyBookings = () => api.get('/bookings').then(r => r.data);
 export const cancelBooking = (id: string) => api.delete(`/bookings/${id}`);

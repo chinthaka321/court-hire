@@ -1,9 +1,11 @@
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Stripe;
+using TennisBooking.Auth;
 using TennisBooking.Data;
 using TennisBooking.Jobs;
 using TennisBooking.Services;
@@ -30,8 +32,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+// Admin = role claim in the JWT OR Role=Admin on the Users table (DB is the source of truth)
 builder.Services.AddAuthorization(opt =>
-    opt.AddPolicy("AdminOnly", p => p.RequireClaim("role", "admin")));
+    opt.AddPolicy("AdminOnly", p => p.AddRequirements(new AdminRequirement())));
+builder.Services.AddScoped<IAuthorizationHandler, AdminAuthorizationHandler>();
 
 // Hangfire
 builder.Services.AddHangfire(cfg => cfg
@@ -41,6 +45,7 @@ builder.Services.AddHangfire(cfg => cfg
 builder.Services.AddHangfireServer();
 
 // App services
+builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<PricingService>();
 builder.Services.AddScoped<AvailabilityService>();
 builder.Services.AddScoped<BookingService>();
@@ -68,6 +73,15 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+
+    // Auto-promote first user to Admin in Development mode if no Admin exists
+    var dbUsers = db.Users.ToList();
+    if (app.Environment.IsDevelopment() && !dbUsers.Any(u => u.Role == TennisBooking.Models.UserRole.Admin) && dbUsers.Any())
+    {
+        var firstUser = dbUsers.First();
+        firstUser.Role = TennisBooking.Models.UserRole.Admin;
+        db.SaveChanges();
+    }
 
     if (app.Environment.IsDevelopment() && !db.Courts.Any(c => c.Active))
     {

@@ -9,7 +9,7 @@ namespace TennisBooking.Controllers;
 [ApiController]
 [Route("api/holds")]
 [Authorize]
-public class HoldsController(BookingService booking, IConfiguration config, IWebHostEnvironment env) : ControllerBase
+public class HoldsController(BookingService booking, UserService userService, IConfiguration config, IWebHostEnvironment env) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateHoldRequest req)
@@ -19,6 +19,7 @@ public class HoldsController(BookingService booking, IConfiguration config, IWeb
 
         try
         {
+            await userService.EnsureUserAsync(User);
             var holdGroup = await booking.CreateHoldAsync(req.CourtId, req.SlotStart.ToUniversalTime(), userId, req.SlotCount);
 
             if (env.IsDevelopment() && config.GetValue<bool>("App:MockPayment"))

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { getCourt, createHold, apiErrorMessage } from '../lib/api';
-import type { Court } from '../types';
+import { getCourt, getAvailability, createHold, apiErrorMessage } from '../lib/api';
+import type { Court, SlotInfo } from '../types';
 import { formatDateTime, formatPrice } from '../lib/utils';
 
 export function BookingConfirmation() {
@@ -21,6 +21,27 @@ export function BookingConfirmation() {
     queryFn: () => getCourt(courtId!),
   });
 
+  const durationMinutes = court ? slotCount * court.slotLengthMinutes : 30;
+  const slotEnd = new Date(new Date(slotDate).getTime() + durationMinutes * 60_000).toISOString();
+
+  // Fetch real-time availability to make sure the slot isn't already booked/held
+  const dateOnlyString = slotDate.split('T')[0];
+  const { data: availability = [], isLoading: loadingAvailability } = useQuery<SlotInfo[]>({
+    queryKey: ['availability', courtId, dateOnlyString],
+    queryFn: () => getAvailability(courtId!, dateOnlyString),
+    enabled: !!courtId && !!court,
+  });
+
+  const baseLength = court?.slotLengthMinutes ?? 30;
+  const slotTimesToCheck = Array.from({ length: slotCount }).map((_, idx) => {
+    return new Date(new Date(slotDate).getTime() + idx * baseLength * 60_000).toISOString();
+  });
+
+  const isSlotUnavailable = !loadingAvailability && court && availability.length > 0 && slotTimesToCheck.some(timeStr => {
+    const s = availability.find(x => new Date(x.slotStart).getTime() === new Date(timeStr).getTime());
+    return !s || s.status !== 'Available';
+  });
+
   async function handlePay() {
     setLoading(true);
     setError(null);
@@ -37,8 +58,6 @@ export function BookingConfirmation() {
     return <div className="p-8 text-center text-sm text-on-surface-muted">Loading…</div>;
   }
 
-  const durationMinutes = slotCount * court.slotLengthMinutes;
-  const slotEnd = new Date(new Date(slotDate).getTime() + durationMinutes * 60_000).toISOString();
 
   return (
     <div className="max-w-lg mx-auto px-4 sm:px-6 py-8">
@@ -66,21 +85,28 @@ export function BookingConfirmation() {
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3.5 text-sm text-red-700 font-medium">
           {error}
         </div>
       )}
 
-      <p className="text-xs text-on-surface-muted text-center mb-6">
-        Your slot will be held for 7 minutes while you complete payment on Stripe.
+      {isSlotUnavailable && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 font-semibold flex items-start gap-2 animate-pulse">
+          <span>⚠️</span>
+          <span>This slot is no longer available. It may have been booked or held by another user. Please go back and select a different slot.</span>
+        </div>
+      )}
+
+      <p className="text-xs font-semibold text-on-surface-muted text-center mb-6 max-w-sm mx-auto leading-normal">
+        ⚠️ Viewing this page does not lock the slot. The court is only reserved for 7 minutes once you click &quot;Pay Now&quot; to proceed.
       </p>
 
       <button
         onClick={handlePay}
-        disabled={loading}
-        className="w-full bg-primary text-white font-semibold py-3.5 rounded-xl text-base hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        disabled={loading || loadingAvailability || isSlotUnavailable}
+        className="w-full bg-primary text-white font-semibold py-3.5 rounded-xl text-base hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
       >
-        {loading ? 'Please wait…' : <>Pay Now <span className="text-lg">›</span></>}
+        {loading ? 'Please wait…' : isSlotUnavailable ? 'Slot Unavailable' : <>Pay Now <span className="text-lg">›</span></>}
       </button>
     </div>
   );

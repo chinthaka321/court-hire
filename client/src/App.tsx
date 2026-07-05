@@ -1,7 +1,7 @@
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect } from 'react';
-import { setAuthToken } from './lib/api';
+import { setAuthToken, getMe } from './lib/api';
 import { Navbar } from './components/Navbar';
 import { AdminRoute } from './components/AdminRoute';
 import { AdminLayout } from './components/AdminLayout';
@@ -20,7 +20,17 @@ import { NotFound } from './pages/NotFound';
 function TokenSyncer() {
   const { getToken } = useAuth();
   useEffect(() => {
-    const refresh = async () => setAuthToken(await getToken());
+    const refresh = async () => {
+      const token = await getToken();
+      setAuthToken(token);
+      if (token) {
+        try {
+          await getMe();
+        } catch (e) {
+          console.error('Failed to sync user with server:', e);
+        }
+      }
+    };
     refresh();
     const id = setInterval(refresh, 55_000);
     return () => clearInterval(id);

@@ -17,21 +17,20 @@ export function SlotCell({ slot, selected, onClick }: Props) {
     <div
       onClick={isAvailable ? onClick : undefined}
       className={cn(
-        'group flex items-center justify-between px-4 sm:px-5 border-b border-[#f0f0f0] last:border-b-0 transition-all',
-        isAvailable && 'cursor-pointer hover:bg-[#f0f7f3] active:bg-primary-light',
-        isHeld && 'bg-amber-50/60 cursor-not-allowed',
-        isBooked && 'bg-[#fafafa] cursor-not-allowed',
-        isPast && 'bg-[#fafafa] opacity-40 cursor-not-allowed',
-        selected && 'bg-primary-light border-l-2 border-l-primary',
+        'group flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-100 last:border-b-0 transition-all duration-300',
+        isAvailable && 'cursor-pointer hover:bg-emerald-50/40 active:bg-primary-light',
+        isHeld && 'bg-amber-50/40 cursor-not-allowed',
+        isBooked && 'bg-gray-50/60 cursor-not-allowed',
+        isPast && 'bg-gray-50/30 opacity-50 cursor-not-allowed',
+        selected && 'bg-primary-light border-l-4 border-l-primary',
       )}
-      style={{ minHeight: '64px' }}
     >
       {/* Left: time */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3.5">
         {isAvailable && (
           <div className={cn(
-            'w-2 h-2 rounded-full shrink-0 transition-colors',
-            'bg-primary group-hover:bg-primary',
+            'w-2 h-2 rounded-full shrink-0 transition-all duration-300',
+            'bg-primary group-hover:scale-125 group-hover:shadow-[0_0_8px_rgba(16,185,129,0.8)]',
           )} />
         )}
         {isHeld && <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />}
@@ -39,46 +38,48 @@ export function SlotCell({ slot, selected, onClick }: Props) {
         {isPast && <div className="w-2 h-2 rounded-full bg-gray-200 shrink-0" />}
 
         <span className={cn(
-          'text-base font-bold',
-          isAvailable ? 'text-on-surface' : 'text-[#9aab9a]',
+          'text-base font-semibold tracking-tight transition-colors duration-200',
+          isAvailable ? 'text-on-surface group-hover:text-primary-dark' : 'text-gray-400',
         )}>
           {formatTime(slot.slotStart)}
-          <span className={cn('text-sm font-normal ml-1', isAvailable ? 'text-on-surface-muted' : 'text-outline-variant')}>
+          <span className={cn('text-sm font-normal ml-1.5', isAvailable ? 'text-gray-400' : 'text-gray-300')}>
             – {formatTime(slot.slotEnd)}
           </span>
         </span>
       </div>
 
       {/* Right: price + status + CTA */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
         {isAvailable && (
           <>
-            <span className="text-sm font-semibold text-on-surface-muted">{formatPrice(slot.price)}</span>
-            <span className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-white bg-primary px-3.5 py-1.5 rounded-lg group-hover:bg-primary-dark transition-colors">
-              Book
-              <svg viewBox="0 0 12 12" fill="currentColor" className="w-2.5 h-2.5">
-                <path d="M1 6h10M6.5 1.5L11 6l-4.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <span className="text-base font-bold text-on-surface-muted group-hover:text-primary-dark transition-colors duration-200">
+              {formatPrice(slot.price)}
+            </span>
+            <span className="flex items-center gap-1.5 text-xs font-bold text-white bg-primary px-4 py-2 rounded-xl transition-all duration-300 shadow-md shadow-primary/10 group-hover:bg-primary-dark group-hover:shadow-lg group-hover:scale-103 group-hover:translate-x-[-2px] active:scale-95">
+              Book Now
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.0" className="w-3 h-3 transition-transform duration-300 group-hover:translate-x-0.5">
+                <path d="M2 6h8M6 2l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </span>
           </>
         )}
         {isHeld && (
-          <span className="text-xs font-medium text-amber-600 bg-amber-100 px-2.5 py-1 rounded-full">
+          <span className="text-xs font-semibold text-amber-700 bg-amber-100/60 px-3 py-1 rounded-full border border-amber-200/50">
             Held
           </span>
         )}
         {isBooked && (
-          <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
+          <span className="text-xs font-semibold text-gray-500 bg-gray-200/60 px-3 py-1 rounded-full">
             Booked
           </span>
         )}
         {slot.status === 'BlackedOut' && (
-          <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
+          <span className="text-xs font-semibold text-gray-400 bg-gray-100/60 px-3 py-1 rounded-full">
             Closed
           </span>
         )}
         {slot.status === 'Past' && (
-          <span className="text-xs text-gray-300">Past</span>
+          <span className="text-xs font-medium text-gray-300 px-2.5">Past</span>
         )}
       </div>
     </div>

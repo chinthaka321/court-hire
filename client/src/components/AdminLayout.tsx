@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, Link } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 
 const NAV = [
@@ -62,18 +62,20 @@ export function AdminLayout() {
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar — desktop only */}
-      <aside className="hidden md:flex flex-col w-56 shrink-0 bg-[#1a4731]">
+      <aside className="hidden md:flex flex-col w-56 shrink-0 bg-gradient-to-b from-[#06331a] to-[#041c0e] border-r border-white/5">
         {/* Sidebar brand header */}
-        <div className="flex items-center gap-2.5 px-5 h-16 border-b border-white/10 shrink-0">
-          <div className="w-7 h-7 rounded-md bg-white/20 flex items-center justify-center">
-            <svg viewBox="0 0 20 20" fill="white" className="w-3.5 h-3.5">
+        <div className="flex items-center gap-2.5 px-6 h-16 border-b border-white/10 shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-md shadow-primary/10">
+            <svg viewBox="0 0 20 20" fill="white" className="w-4.5 h-4.5">
               <circle cx="10" cy="10" r="7" stroke="white" strokeWidth="1.5" fill="none" />
               <path d="M3.5 10 Q10 4 16.5 10 Q10 16 3.5 10" fill="white" opacity="0.9" />
             </svg>
           </div>
-          <span className="font-bold text-white text-base tracking-tight">CourtBook</span>
+          <span className="font-display font-bold text-white text-base tracking-tight">CourtBook</span>
         </div>
-        <nav className="flex-1 pt-2">
+        
+        {/* Nav links */}
+        <nav className="flex-1 pt-4">
           {NAV.map(({ to, label, end }) => {
             const Icon = ICONS[label];
             return (
@@ -82,10 +84,10 @@ export function AdminLayout() {
                 to={to}
                 end={end}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-5 py-3 text-sm font-medium transition-colors ${
+                  `flex items-center gap-3 px-4 py-2.5 mx-3 my-1 rounded-xl text-sm font-medium transition-all duration-200 ${
                     isActive
-                      ? 'bg-white/15 text-white'
-                      : 'text-white/55 hover:bg-white/10 hover:text-white'
+                      ? 'bg-primary text-white shadow-md shadow-primary/20'
+                      : 'text-white/60 hover:bg-white/5 hover:text-white'
                   }`
                 }
               >
@@ -96,21 +98,29 @@ export function AdminLayout() {
           })}
         </nav>
 
-        <div className="p-4 border-t border-white/10">
-          <p className="text-[10px] text-white/35 uppercase tracking-wider font-medium">Administrator</p>
+        {/* Exit & Role info */}
+        <div className="p-4 mx-3 mb-4 rounded-xl bg-white/5 border border-white/5">
+          <p className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">Logged in as</p>
+          <p className="text-xs text-white/80 font-medium truncate mt-0.5">{displayName}</p>
+          <Link
+            to="/"
+            className="flex items-center gap-1.5 text-xs text-primary hover:text-primary-dark font-medium mt-3 transition-colors"
+          >
+            ← Exit Panel
+          </Link>
         </div>
       </aside>
 
       {/* Main area */}
       <div className="flex-1 min-w-0 flex flex-col bg-surface overflow-hidden">
         {/* Top header bar */}
-        <header className="hidden md:flex items-center justify-between h-16 px-6 bg-white border-b border-surface-high shrink-0">
+        <header className="hidden md:flex items-center justify-between h-16 px-6 bg-white/70 backdrop-blur-md border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-2 text-sm text-on-surface-muted">
-            <span className="font-semibold text-on-surface">Admin Panel</span>
+            <span className="font-display font-semibold text-on-surface text-base">Control Center</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-on-surface-muted">{displayName}</span>
-            <div className="w-8 h-8 rounded-full bg-[#1a4731] flex items-center justify-center">
+            <span className="text-sm font-medium text-on-surface-muted">{displayName}</span>
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-sm">
               <span className="text-xs font-bold text-white">{initials}</span>
             </div>
           </div>
@@ -123,7 +133,7 @@ export function AdminLayout() {
       </div>
 
       {/* Bottom nav — mobile only */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#1a4731] flex z-50 border-t border-white/10">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#06331a] flex z-50 border-t border-white/5">
         {NAV.map(({ to, label, end }) => {
           const Icon = ICONS[label];
           return (
@@ -132,8 +142,8 @@ export function AdminLayout() {
               to={to}
               end={end}
               className={({ isActive }) =>
-                `flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium transition-colors ${
-                  isActive ? 'text-white' : 'text-white/40'
+                `flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-all duration-200 ${
+                  isActive ? 'text-primary bg-white/5' : 'text-white/45'
                 }`
               }
             >
