@@ -43,9 +43,13 @@ public class CourtsController(AppDbContext db) : ControllerBase
         {
             return BadRequest(new { error = "Name is required." });
         }
-        if (req.Close <= req.Open)
+        if (req.Close != TimeOnly.MinValue && req.Close <= req.Open)
         {
             return BadRequest(new { error = "Close time must be after open time." });
+        }
+        if (req.SlotLengthMinutes != 30)
+        {
+            return BadRequest(new { error = "Slot length must be exactly 30 minutes." });
         }
 
         var court = new Court
@@ -71,9 +75,13 @@ public class CourtsController(AppDbContext db) : ControllerBase
         {
             return BadRequest(new { error = "Name is required." });
         }
-        if (req.Close <= req.Open)
+        if (req.Close != TimeOnly.MinValue && req.Close <= req.Open)
         {
             return BadRequest(new { error = "Close time must be after open time." });
+        }
+        if (req.SlotLengthMinutes != 30)
+        {
+            return BadRequest(new { error = "Slot length must be exactly 30 minutes." });
         }
 
         var court = await db.Courts.FindAsync(id);

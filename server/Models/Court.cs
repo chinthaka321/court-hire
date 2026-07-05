@@ -11,7 +11,7 @@ public class Court
     public Guid Id { get; set; }
     public string Name { get; set; } = null!;
     public OpeningHours OpeningHours { get; set; } = null!;
-    public int SlotLengthMinutes { get; set; } = 60;
+    public int SlotLengthMinutes { get; set; } = 30;
     public TimeOnly DayNightBoundary { get; set; }
     public bool Active { get; set; } = true;
 

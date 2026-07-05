@@ -35,7 +35,7 @@ export function MyBookings() {
     return (
       <div className="max-w-md mx-auto px-4 pt-24 text-center">
         <h1 className="text-xl font-bold text-on-surface">Sign in to view your bookings</h1>
-        <p className="text-sm text-on-surface-muted mt-2 mb-6">Your upcoming and past reservations live here.</p>
+        <p className="text-sm text-on-surface-muted mt-2 mb-6">Your upcoming and past bookings live here.</p>
         <SignInButton mode="modal">
           <button className="bg-primary text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-primary-dark transition-colors">
             Sign In
@@ -56,7 +56,7 @@ export function MyBookings() {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 pb-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-on-surface">My Bookings</h1>
-        <p className="text-sm text-on-surface-muted mt-0.5">Your upcoming and past court reservations</p>
+        <p className="text-sm text-on-surface-muted mt-0.5">Your upcoming and past court bookings</p>
       </div>
 
       {cancelError && (

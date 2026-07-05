@@ -17,12 +17,6 @@ public class AdminAuthorizationHandler(AppDbContext db) : AuthorizationHandler<A
     protected override async Task HandleRequirementAsync(
         AuthorizationHandlerContext context, AdminRequirement requirement)
     {
-        if (context.User.HasClaim("role", "admin"))
-        {
-            context.Succeed(requirement);
-            return;
-        }
-
         var sub = context.User.FindFirst("sub")?.Value;
         if (sub is null) return;
 

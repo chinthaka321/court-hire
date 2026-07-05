@@ -75,7 +75,7 @@ export function AdminCourts() {
   const activeCourts = courts.filter(c => c.active);
   const inactiveCourts = courts.filter(c => !c.active);
 
-  const isTimeInvalid = form.close <= form.open;
+  const isTimeInvalid = form.close !== "00:00" && form.close <= form.open;
   const isFormInvalid = !form.name.trim() || isTimeInvalid;
 
   return (
@@ -84,7 +84,7 @@ export function AdminCourts() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-extrabold text-on-surface tracking-tight">Courts</h1>
-          <p className="text-sm text-on-surface-muted mt-1">Configure operating hours, slot base unit, and pricing zones</p>
+          <p className="text-sm text-on-surface-muted mt-1">Configure operating hours, slot base unit, and pricing bands</p>
         </div>
         {!showForm && (
           <button
@@ -127,7 +127,7 @@ export function AdminCourts() {
             <Field label="Day / Night boundary">
               <input type="time" className={inputCls} value={form.dayNightBoundary}
                 onChange={e => setForm(f => ({ ...f, dayNightBoundary: e.target.value }))} />
-              <p className="text-[11px] font-medium text-on-surface-muted mt-2 px-1">Sets the split time for Peak Night rates</p>
+              <p className="text-[11px] font-medium text-on-surface-muted mt-2 px-1">Sets the split time for Night rates</p>
             </Field>
           </div>
 

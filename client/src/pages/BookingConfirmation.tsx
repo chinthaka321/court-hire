@@ -74,7 +74,7 @@ export function BookingConfirmation() {
       <div className="bg-white rounded-xl border border-surface-high divide-y divide-[#f0f0f0] mb-4">
         <Row label="Court"      value={court.name} />
         <Row label="Date & Time" value={formatDateTime(slotDate)} />
-        <Row label="Duration"   value={`${durationMinutes} min`} />
+        <Row label="Session Duration" value={`${durationMinutes} min`} />
         <Row label="Ends"       value={formatDateTime(slotEnd)} />
       </div>
 

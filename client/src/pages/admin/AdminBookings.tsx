@@ -48,7 +48,7 @@ export function AdminBookings() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-on-surface">Bookings</h1>
-          <p className="text-sm text-on-surface-muted mt-0.5">View, search and manage all court reservations</p>
+          <p className="text-sm text-on-surface-muted mt-0.5">View, search and manage all court bookings</p>
         </div>
       </div>
 

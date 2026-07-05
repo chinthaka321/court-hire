@@ -18,6 +18,11 @@ public class CourtsControllerTests(AuthTestFactory factory) : IClassFixture<Auth
         var response = await _client.GetAsync("/api/courts");
 
         // Assert
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Failed with status {response.StatusCode}. Response: {body}");
+        }
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var courts = await response.Content.ReadFromJsonAsync<List<CourtDto>>();
         Assert.NotNull(courts);
