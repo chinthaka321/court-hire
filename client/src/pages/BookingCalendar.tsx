@@ -66,7 +66,6 @@ export function BookingCalendar() {
   const { data: courts = [] } = useQuery<Court[]>({
     queryKey: ['courts'],
     queryFn: getCourts,
-    refetchInterval: 15_000,
   });
 
   // Reschedule mode: the booking being moved locks the court and duration
@@ -90,6 +89,8 @@ export function BookingCalendar() {
     queryKey: ['availability', activeCourt, toDateOnlyString(selectedDate)],
     queryFn: () => getAvailability(activeCourt!, toDateOnlyString(selectedDate)),
     enabled: !!activeCourt,
+    // Faster than the 15s default (main.tsx) — this is the double-booking-race-sensitive
+    // view, see ADR-0011.
     refetchInterval: 5_000,
   });
 

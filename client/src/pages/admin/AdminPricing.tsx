@@ -124,7 +124,7 @@ function RateGridEditor({ courtId, initialRates }: { courtId: string; initialRat
 export function AdminPricing() {
   const [pickedCourtId, setPickedCourtId] = useState<string | null>(null);
 
-  const { data: courts = [] } = useQuery<Court[]>({ queryKey: ['courts'], queryFn: getCourts, refetchInterval: 15_000 });
+  const { data: courts = [] } = useQuery<Court[]>({ queryKey: ['courts'], queryFn: getCourts });
 
   // Default to the first court until the admin picks one
   const selectedCourtId = pickedCourtId ?? courts[0]?.id ?? '';

@@ -79,18 +79,21 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
     [HttpGet("blackouts/conflicts")]
     public async Task<IActionResult> GetBlackoutConflicts([FromQuery] Guid courtId, [FromQuery] DateTime start, [FromQuery] DateTime end)
     {
+        var court = await db.Courts.AsNoTracking().FirstOrDefaultAsync(c => c.Id == courtId);
+        if (court is null) return NotFound();
+
         var rangeStart = start.ToUniversalTime();
         var rangeEnd = end.ToUniversalTime();
+        var slotLength = court.SlotLengthMinutes;
 
-        var candidates = await db.Bookings
-            .Where(b => b.CourtId == courtId && b.State != BookingState.Cancelled)
+        // Filter the overlap in SQL (same pattern as GetAllBookings below) instead of
+        // pulling the court's entire non-cancelled booking history into memory first.
+        var conflicts = await db.Bookings
+            .Where(b => b.CourtId == courtId && b.State != BookingState.Cancelled
+                        && b.SlotStarts.Any(s => s < rangeEnd && s.AddMinutes(slotLength) > rangeStart))
             .Include(b => b.User)
-            .ToListAsync();
-
-        var conflicts = candidates
-            .Where(b => b.SlotStarts.Any(s => s < rangeEnd && s.AddMinutes(30) > rangeStart))
             .Select(b => new { b.Id, b.SlotStarts, User = new { b.User.Email, b.User.Name } })
-            .ToList();
+            .ToListAsync();
 
         return Ok(conflicts);
     }

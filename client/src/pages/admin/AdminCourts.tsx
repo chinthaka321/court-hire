@@ -30,15 +30,9 @@ export function AdminCourts() {
   const [form, setForm] = useState<CourtForm>(blank);
   const [showForm, setShowForm] = useState(false);
 
-  const [toggleError, setToggleError] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-
   const { data: courts = [] } = useQuery<Court[]>({
     queryKey: ['admin-courts'],
     queryFn: adminGetCourts,
-    refetchInterval: 10_000,
   });
 
   function invalidateCourtDependents() {
@@ -59,31 +53,25 @@ export function AdminCourts() {
     },
   });
 
+  // Single shared mutation per action; which row is "in flight" is read back off
+  // `mutation.variables` rather than tracked in separate state (React Query already
+  // resets isPending/isError when a new mutate() call starts).
   const toggleMutation = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) => adminToggleCourt(id, active),
-    onMutate: ({ id }: { id: string; active: boolean }) => setTogglingId(id),
-    onSuccess: () => {
-      setToggleError(null);
-      invalidateCourtDependents();
-    },
-    onError: (e: unknown) => {
-      setToggleError(apiErrorMessage(e, 'Failed to update court status. Please try again.'));
-    },
-    onSettled: () => setTogglingId(null),
+    onSuccess: invalidateCourtDependents,
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteCourt(id),
-    onMutate: (id: string) => setDeletingId(id),
-    onSuccess: () => {
-      setDeleteError(null);
-      invalidateCourtDependents();
-    },
-    onError: (e: unknown) => {
-      setDeleteError(apiErrorMessage(e, 'Failed to delete court. Please try again.'));
-    },
-    onSettled: () => setDeletingId(null),
+    onSuccess: invalidateCourtDependents,
   });
+
+  const toggleError = toggleMutation.isError
+    ? apiErrorMessage(toggleMutation.error, 'Failed to update court status. Please try again.')
+    : null;
+  const deleteError = deleteMutation.isError
+    ? apiErrorMessage(deleteMutation.error, 'Failed to delete court. Please try again.')
+    : null;
 
   function editCourt(c: Court) {
     setEditing(c.id);
@@ -210,19 +198,17 @@ export function AdminCourts() {
                 court={c}
                 onEdit={() => editCourt(c)}
                 onToggle={() => {
-                  setToggleError(null);
                   if (window.confirm(`Deactivate "${c.name}"? It will be hidden from customer bookings.`)) {
                     toggleMutation.mutate({ id: c.id, active: false });
                   }
                 }}
-                toggling={togglingId === c.id}
+                toggling={toggleMutation.isPending && toggleMutation.variables?.id === c.id}
                 onDelete={() => {
-                  setDeleteError(null);
                   if (window.confirm(`Permanently delete "${c.name}"? This cannot be undone.`)) {
                     deleteMutation.mutate(c.id);
                   }
                 }}
-                deleting={deletingId === c.id}
+                deleting={deleteMutation.isPending && deleteMutation.variables === c.id}
               />
             ))}
           </div>
@@ -239,18 +225,14 @@ export function AdminCourts() {
                     key={c.id}
                     court={c}
                     onEdit={() => editCourt(c)}
-                    onToggle={() => {
-                      setToggleError(null);
-                      toggleMutation.mutate({ id: c.id, active: true });
-                    }}
-                    toggling={togglingId === c.id}
+                    onToggle={() => toggleMutation.mutate({ id: c.id, active: true })}
+                    toggling={toggleMutation.isPending && toggleMutation.variables?.id === c.id}
                     onDelete={() => {
-                      setDeleteError(null);
                       if (window.confirm(`Permanently delete "${c.name}"? This cannot be undone.`)) {
                         deleteMutation.mutate(c.id);
                       }
                     }}
-                    deleting={deletingId === c.id}
+                    deleting={deleteMutation.isPending && deleteMutation.variables === c.id}
                   />
                 ))}
               </div>

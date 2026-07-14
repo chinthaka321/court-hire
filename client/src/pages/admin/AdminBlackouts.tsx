@@ -18,14 +18,10 @@ export function AdminBlackouts() {
   const [form, setForm] = useState({ courtId: '', start: '', end: '', reason: '' });
   const [showForm, setShowForm] = useState(false);
 
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleteErrorId, setDeleteErrorId] = useState<string | null>(null);
-
-  const { data: courts = [] } = useQuery<Court[]>({ queryKey: ['courts'], queryFn: getCourts, refetchInterval: 15_000 });
+  const { data: courts = [] } = useQuery<Court[]>({ queryKey: ['courts'], queryFn: getCourts });
   const { data: blackouts = [] } = useQuery<Blackout[]>({
     queryKey: ['blackouts', filterCourtId],
     queryFn: () => adminGetBlackouts(filterCourtId || undefined),
-    refetchInterval: 10_000,
   });
 
   const createMutation = useMutation({
@@ -64,12 +60,7 @@ export function AdminBlackouts() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => adminDeleteBlackout(id),
-    onMutate: (id: string) => { setDeleteId(id); setDeleteErrorId(null); },
-    onSuccess: () => {
-      setDeleteId(null);
-      qc.invalidateQueries({ queryKey: ['blackouts'] });
-    },
-    onError: (_e, id) => { setDeleteId(null); setDeleteErrorId(id); },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['blackouts'] }),
   });
 
   function isUpcoming(start: string) {
@@ -199,12 +190,12 @@ export function AdminBlackouts() {
                       onClick={() => {
                         if (window.confirm('Remove this blackout?')) deleteMutation.mutate(bl.id);
                       }}
-                      disabled={deleteMutation.isPending && deleteId === bl.id}
+                      disabled={deleteMutation.isPending && deleteMutation.variables === bl.id}
                       className="text-xs font-medium text-red-600 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 transition-colors disabled:opacity-50"
                     >
-                      {deleteMutation.isPending && deleteId === bl.id ? 'Removing…' : 'Remove'}
+                      {deleteMutation.isPending && deleteMutation.variables === bl.id ? 'Removing…' : 'Remove'}
                     </button>
-                    {deleteErrorId === bl.id && (
+                    {deleteMutation.isError && deleteMutation.variables === bl.id && (
                       <span className="text-[11px] text-red-600 font-medium">{apiErrorMessage(deleteMutation.error, 'Failed to remove.')}</span>
                     )}
                   </div>

@@ -7,7 +7,10 @@ import './index.css';
 import App from './App';
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 30_000 } },
+  // No push infra yet (ADR-0011) — poll by default so lists/calendars update without
+  // a manual refresh. Queries that need a faster cadence (e.g. the availability grid)
+  // override this per-query.
+  defaultOptions: { queries: { staleTime: 30_000, refetchInterval: 15_000 } },
 });
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;

@@ -23,8 +23,6 @@ export function AdminBookings() {
   const [date, setDate] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const [cancelId, setCancelId] = useState<string | null>(null);
-  const [cancelErrorId, setCancelErrorId] = useState<string | null>(null);
 
   // Debounce free-text search so we don't hit the API on every keystroke.
   useEffect(() => {
@@ -40,17 +38,11 @@ export function AdminBookings() {
       ...(date ? { date } : {}),
       ...(search ? { search } : {}),
     }),
-    refetchInterval: 15_000,
   });
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => adminCancelBooking(id),
-    onMutate: (id: string) => { setCancelId(id); setCancelErrorId(null); },
-    onSuccess: () => {
-      setCancelId(null);
-      qc.invalidateQueries({ queryKey: ['admin-bookings'] });
-    },
-    onError: (_e, id) => { setCancelId(null); setCancelErrorId(id); },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-bookings'] }),
   });
 
   const bookings = data?.items ?? [];
@@ -140,13 +132,13 @@ export function AdminBookings() {
                             cancelMutation.mutate(b.id);
                           }
                         }}
-                        disabled={cancelMutation.isPending && cancelId === b.id}
+                        disabled={cancelMutation.isPending && cancelMutation.variables === b.id}
                         className="text-xs font-medium text-red-600 hover:text-red-800 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 transition-colors disabled:opacity-50"
                       >
-                        {cancelMutation.isPending && cancelId === b.id ? 'Cancelling…' : 'Cancel & Refund'}
+                        {cancelMutation.isPending && cancelMutation.variables === b.id ? 'Cancelling…' : 'Cancel & Refund'}
                       </button>
                     )}
-                    {cancelErrorId === b.id && (
+                    {cancelMutation.isError && cancelMutation.variables === b.id && (
                       <p className="text-[11px] text-red-600 font-medium mt-1">
                         {apiErrorMessage(cancelMutation.error, 'Failed to cancel booking.')}
                       </p>
