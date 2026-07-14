@@ -35,9 +35,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<Booking>()
             .HasIndex(bk => bk.HoldGroupId);
 
-        // Prevent double-booking: unique (court_id, slot_start) enforced at DB level
-        // via application-layer check + Hold unique index as backstop.
-        // Full cross-table enforcement is done via a DB trigger in migration.
+        // Prevent double-booking: Hold has a real DB-level UNIQUE(CourtId, SlotStart)
+        // index above. Booking.SlotStarts is an array column with no DB-level uniqueness —
+        // Bookings are only race-safe because every Booking is created by consuming an
+        // already slot-exclusive Hold (see BookingService.ConfirmBookingAsync). That's an
+        // application-level invariant, not a DB-enforced one; there is no cross-table
+        // trigger or constraint. See tracked issue for adding real DB-level enforcement
+        // on Booking.
 
         b.Entity<AppUser>().Property(u => u.Role).HasConversion<string>();
         b.Entity<AppUser>().Property(u => u.SkillLevel).HasConversion<string>();

@@ -1,8 +1,14 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCourts, adminGetBlackouts, adminCreateBlackout, adminDeleteBlackout } from '../../lib/api';
+import { getCourts, adminGetBlackouts, adminCreateBlackout, adminDeleteBlackout, adminGetBlackoutConflicts, apiErrorMessage } from '../../lib/api';
 import type { Court, Blackout } from '../../types';
 import { formatDateTime } from '../../lib/utils';
+
+interface BlackoutConflict {
+  id: string;
+  slotStarts: string[];
+  user: { email: string; name: string | null };
+}
 
 const inputCls = 'w-full border border-outline-variant rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary bg-white';
 
@@ -12,10 +18,14 @@ export function AdminBlackouts() {
   const [form, setForm] = useState({ courtId: '', start: '', end: '', reason: '' });
   const [showForm, setShowForm] = useState(false);
 
-  const { data: courts = [] } = useQuery<Court[]>({ queryKey: ['courts'], queryFn: getCourts });
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteErrorId, setDeleteErrorId] = useState<string | null>(null);
+
+  const { data: courts = [] } = useQuery<Court[]>({ queryKey: ['courts'], queryFn: getCourts, refetchInterval: 15_000 });
   const { data: blackouts = [] } = useQuery<Blackout[]>({
     queryKey: ['blackouts', filterCourtId],
     queryFn: () => adminGetBlackouts(filterCourtId || undefined),
+    refetchInterval: 10_000,
   });
 
   const createMutation = useMutation({
@@ -34,9 +44,32 @@ export function AdminBlackouts() {
     },
   });
 
+  // ADR-0012: blackouts can overlap existing paid bookings — warn the admin with the
+  // affected players before saving, but don't block it (business call, not a hard rule).
+  const conflictCheckMutation = useMutation({
+    mutationFn: () => adminGetBlackoutConflicts(form.courtId, `${form.start}:00Z`, `${form.end}:00Z`) as Promise<BlackoutConflict[]>,
+    onSuccess: (conflicts) => {
+      if (conflicts.length === 0) {
+        createMutation.mutate();
+        return;
+      }
+      const names = conflicts.map(c => c.user.name || c.user.email).join(', ');
+      const proceed = window.confirm(
+        `Warning: ${conflicts.length} existing booking(s) fall inside this blackout window (${names}). ` +
+        `They will NOT be cancelled or refunded automatically — the slot will just show as blacked out. Save anyway?`
+      );
+      if (proceed) createMutation.mutate();
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => adminDeleteBlackout(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['blackouts'] }),
+    onMutate: (id: string) => { setDeleteId(id); setDeleteErrorId(null); },
+    onSuccess: () => {
+      setDeleteId(null);
+      qc.invalidateQueries({ queryKey: ['blackouts'] });
+    },
+    onError: (_e, id) => { setDeleteId(null); setDeleteErrorId(id); },
   });
 
   function isUpcoming(start: string) {
@@ -95,11 +128,11 @@ export function AdminBlackouts() {
           </div>
           <div className="flex gap-3 mt-4">
             <button
-              onClick={() => createMutation.mutate()}
-              disabled={createMutation.isPending || !form.courtId || !form.start || !form.end || form.end <= form.start}
+              onClick={() => conflictCheckMutation.mutate()}
+              disabled={conflictCheckMutation.isPending || createMutation.isPending || !form.courtId || !form.start || !form.end || form.end <= form.start}
               className="bg-primary text-white text-sm font-semibold px-5 py-2 rounded-lg disabled:opacity-50 hover:bg-primary-dark transition-colors"
             >
-              {createMutation.isPending ? 'Saving…' : 'Save Blackout'}
+              {conflictCheckMutation.isPending ? 'Checking…' : createMutation.isPending ? 'Saving…' : 'Save Blackout'}
             </button>
             <button
               onClick={() => { setShowForm(false); setForm({ courtId: '', start: '', end: '', reason: '' }); }}
@@ -108,6 +141,11 @@ export function AdminBlackouts() {
               Cancel
             </button>
           </div>
+          {(createMutation.isError || conflictCheckMutation.isError) && (
+            <p className="text-xs font-semibold text-red-600 mt-3">
+              {apiErrorMessage(createMutation.error ?? conflictCheckMutation.error, 'Failed to save blackout. Please try again.')}
+            </p>
+          )}
         </div>
       )}
 
@@ -156,14 +194,20 @@ export function AdminBlackouts() {
                   )}
                 </div>
                 {upcoming && (
-                  <button
-                    onClick={() => {
-                      if (window.confirm('Remove this blackout?')) deleteMutation.mutate(bl.id);
-                    }}
-                    className="text-xs font-medium text-red-600 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 transition-colors shrink-0"
-                  >
-                    Remove
-                  </button>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <button
+                      onClick={() => {
+                        if (window.confirm('Remove this blackout?')) deleteMutation.mutate(bl.id);
+                      }}
+                      disabled={deleteMutation.isPending && deleteId === bl.id}
+                      className="text-xs font-medium text-red-600 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 transition-colors disabled:opacity-50"
+                    >
+                      {deleteMutation.isPending && deleteId === bl.id ? 'Removing…' : 'Remove'}
+                    </button>
+                    {deleteErrorId === bl.id && (
+                      <span className="text-[11px] text-red-600 font-medium">{apiErrorMessage(deleteMutation.error, 'Failed to remove.')}</span>
+                    )}
+                  </div>
                 )}
               </div>
             );

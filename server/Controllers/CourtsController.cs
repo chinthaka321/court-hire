@@ -98,11 +98,24 @@ public class CourtsController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id:guid}"), Authorize(Policy = "AdminOnly")]
-    public async Task<IActionResult> Deactivate(Guid id)
+    public async Task<IActionResult> Delete(Guid id)
     {
         var court = await db.Courts.FindAsync(id);
         if (court is null) return NotFound();
-        court.Active = false;
+
+        var hasBookings = await db.Bookings.AnyAsync(b => b.CourtId == id);
+        if (hasBookings)
+        {
+            return Conflict(new { error = "This court has existing bookings and cannot be deleted. Deactivate it instead." });
+        }
+
+        var hasActiveHolds = await db.Holds.AnyAsync(h => h.CourtId == id && h.ExpiresAt > DateTime.UtcNow);
+        if (hasActiveHolds)
+        {
+            return Conflict(new { error = "This court has an in-progress checkout. Try again shortly." });
+        }
+
+        db.Courts.Remove(court);
         await db.SaveChangesAsync();
         return NoContent();
     }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminGetCourts, adminToggleCourt, createCourt, updateCourt } from '../../lib/api';
+import { adminGetCourts, adminToggleCourt, createCourt, updateCourt, deleteCourt, apiErrorMessage } from '../../lib/api';
 import type { Court } from '../../types';
 
 interface CourtForm {
@@ -30,16 +30,29 @@ export function AdminCourts() {
   const [form, setForm] = useState<CourtForm>(blank);
   const [showForm, setShowForm] = useState(false);
 
+  const [toggleError, setToggleError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const { data: courts = [] } = useQuery<Court[]>({
     queryKey: ['admin-courts'],
     queryFn: adminGetCourts,
+    refetchInterval: 10_000,
   });
+
+  function invalidateCourtDependents() {
+    qc.invalidateQueries({ queryKey: ['admin-courts'] });
+    qc.invalidateQueries({ queryKey: ['courts'] });
+    qc.invalidateQueries({ queryKey: ['availability'] });
+    qc.invalidateQueries({ queryKey: ['admin-pricing'] });
+    qc.invalidateQueries({ queryKey: ['blackouts'] });
+  }
 
   const saveMutation = useMutation({
     mutationFn: () => editing ? updateCourt(editing, form) : createCourt(form),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-courts'] });
-      qc.invalidateQueries({ queryKey: ['courts'] });
+      invalidateCourtDependents();
       setShowForm(false);
       setEditing(null);
       setForm(blank);
@@ -48,10 +61,28 @@ export function AdminCourts() {
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) => adminToggleCourt(id, active),
+    onMutate: ({ id }: { id: string; active: boolean }) => setTogglingId(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-courts'] });
-      qc.invalidateQueries({ queryKey: ['courts'] });
+      setToggleError(null);
+      invalidateCourtDependents();
     },
+    onError: (e: unknown) => {
+      setToggleError(apiErrorMessage(e, 'Failed to update court status. Please try again.'));
+    },
+    onSettled: () => setTogglingId(null),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteCourt(id),
+    onMutate: (id: string) => setDeletingId(id),
+    onSuccess: () => {
+      setDeleteError(null);
+      invalidateCourtDependents();
+    },
+    onError: (e: unknown) => {
+      setDeleteError(apiErrorMessage(e, 'Failed to delete court. Please try again.'));
+    },
+    onSettled: () => setDeletingId(null),
   });
 
   function editCourt(c: Court) {
@@ -121,7 +152,7 @@ export function AdminCourts() {
             </Field>
             <Field label="Slot length (base unit)">
               <div className={`${inputCls} text-on-surface-muted bg-gray-50 border-gray-100 cursor-not-allowed select-none font-medium`}>
-                30 minutes — fixed calendar block
+                {form.slotLengthMinutes} minutes — fixed calendar block
               </div>
             </Field>
             <Field label="Day / Night boundary">
@@ -151,8 +182,16 @@ export function AdminCourts() {
             </button>
           </div>
           {saveMutation.isError && (
-            <p className="text-xs font-semibold text-red-600 mt-4 px-1">Failed to save court. Please verify your permissions and try again.</p>
+            <p className="text-xs font-semibold text-red-600 mt-4 px-1">
+              {apiErrorMessage(saveMutation.error, 'Failed to save court. Please verify your permissions and try again.')}
+            </p>
           )}
+        </div>
+      )}
+
+      {(toggleError || deleteError) && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl px-5 py-3 mb-6 text-sm font-semibold text-red-700">
+          {toggleError ?? deleteError}
         </div>
       )}
 
@@ -171,11 +210,19 @@ export function AdminCourts() {
                 court={c}
                 onEdit={() => editCourt(c)}
                 onToggle={() => {
+                  setToggleError(null);
                   if (window.confirm(`Deactivate "${c.name}"? It will be hidden from customer bookings.`)) {
                     toggleMutation.mutate({ id: c.id, active: false });
                   }
                 }}
-                toggling={toggleMutation.isPending}
+                toggling={togglingId === c.id}
+                onDelete={() => {
+                  setDeleteError(null);
+                  if (window.confirm(`Permanently delete "${c.name}"? This cannot be undone.`)) {
+                    deleteMutation.mutate(c.id);
+                  }
+                }}
+                deleting={deletingId === c.id}
               />
             ))}
           </div>
@@ -192,8 +239,18 @@ export function AdminCourts() {
                     key={c.id}
                     court={c}
                     onEdit={() => editCourt(c)}
-                    onToggle={() => toggleMutation.mutate({ id: c.id, active: true })}
-                    toggling={toggleMutation.isPending}
+                    onToggle={() => {
+                      setToggleError(null);
+                      toggleMutation.mutate({ id: c.id, active: true });
+                    }}
+                    toggling={togglingId === c.id}
+                    onDelete={() => {
+                      setDeleteError(null);
+                      if (window.confirm(`Permanently delete "${c.name}"? This cannot be undone.`)) {
+                        deleteMutation.mutate(c.id);
+                      }
+                    }}
+                    deleting={deletingId === c.id}
                   />
                 ))}
               </div>
@@ -206,12 +263,14 @@ export function AdminCourts() {
 }
 
 function CourtCard({
-  court, onEdit, onToggle, toggling,
+  court, onEdit, onToggle, toggling, onDelete, deleting,
 }: {
   court: Court;
   onEdit: () => void;
   onToggle: () => void;
   toggling: boolean;
+  onDelete: () => void;
+  deleting: boolean;
 }) {
   return (
     <div className={`bg-white rounded-2xl border p-6 transition-all duration-300 shadow-sm shadow-gray-200/20 ${
@@ -255,23 +314,33 @@ function CourtCard({
         </div>
       </div>
 
-      {court.active ? (
+      <div className="flex gap-2">
+        {court.active ? (
+          <button
+            onClick={onToggle}
+            disabled={toggling || deleting}
+            className="flex-1 text-xs font-bold text-red-600 bg-red-50/50 border border-red-100/80 rounded-xl py-2.5 hover:bg-red-50 hover:text-red-700 transition-all disabled:opacity-50 cursor-pointer"
+          >
+            {toggling ? 'Deactivating…' : 'Deactivate Court'}
+          </button>
+        ) : (
+          <button
+            onClick={onToggle}
+            disabled={toggling || deleting}
+            className="flex-1 text-xs font-bold text-primary bg-primary-light border border-primary/10 rounded-xl py-2.5 hover:bg-primary/10 transition-all disabled:opacity-50 cursor-pointer"
+          >
+            {toggling ? 'Reactivating…' : 'Reactivate Court'}
+          </button>
+        )}
         <button
-          onClick={onToggle}
-          disabled={toggling}
-          className="w-full text-xs font-bold text-red-600 bg-red-50/50 border border-red-100/80 rounded-xl py-2.5 hover:bg-red-50 hover:text-red-700 transition-all disabled:opacity-50 cursor-pointer"
+          onClick={onDelete}
+          disabled={toggling || deleting}
+          title="Delete permanently (only possible if the court has no bookings)"
+          className="text-xs font-bold text-white bg-red-600 rounded-xl px-4 py-2.5 hover:bg-red-700 transition-all disabled:opacity-50 cursor-pointer"
         >
-          Deactivate Court
+          {deleting ? 'Deleting…' : 'Delete'}
         </button>
-      ) : (
-        <button
-          onClick={onToggle}
-          disabled={toggling}
-          className="w-full text-xs font-bold text-primary bg-primary-light border border-primary/10 rounded-xl py-2.5 hover:bg-primary/10 transition-all disabled:opacity-50 cursor-pointer"
-        >
-          Reactivate Court
-        </button>
-      )}
+      </div>
     </div>
   );
 }

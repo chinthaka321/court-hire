@@ -44,16 +44,24 @@ function PriceCell({
   );
 }
 
+function isValidPrice(value: string): boolean {
+  if (value.trim() === '') return false;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0;
+}
+
 function RateGridEditor({ courtId, initialRates }: { courtId: string; initialRates: PriceRate[] }) {
   const qc = useQueryClient();
   const [grid, setGrid] = useState<Grid>(() => gridFromRates(initialRates));
 
+  const isGridInvalid = (Object.values(grid) as string[]).some(v => !isValidPrice(v));
+
   const saveMutation = useMutation({
     mutationFn: () => adminUpsertPricing(courtId, [
-      { dayType: 'Weekday', band: 'Day',   price: parseFloat(grid.Weekday_Day   || '0') },
-      { dayType: 'Weekday', band: 'Night', price: parseFloat(grid.Weekday_Night || '0') },
-      { dayType: 'Weekend', band: 'Day',   price: parseFloat(grid.Weekend_Day   || '0') },
-      { dayType: 'Weekend', band: 'Night', price: parseFloat(grid.Weekend_Night || '0') },
+      { dayType: 'Weekday', band: 'Day',   price: parseFloat(grid.Weekday_Day) },
+      { dayType: 'Weekday', band: 'Night', price: parseFloat(grid.Weekday_Night) },
+      { dayType: 'Weekend', band: 'Day',   price: parseFloat(grid.Weekend_Day) },
+      { dayType: 'Weekend', band: 'Night', price: parseFloat(grid.Weekend_Night) },
     ]),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-pricing', courtId] }),
   });
@@ -91,9 +99,13 @@ function RateGridEditor({ courtId, initialRates }: { courtId: string; initialRat
         Price changes only affect new bookings. Existing holds and confirmed bookings retain their captured price.
       </p>
 
+      {isGridInvalid && (
+        <p className="text-xs font-semibold text-red-600 mb-3">All four prices must be filled in and zero or greater.</p>
+      )}
+
       <button
         onClick={() => saveMutation.mutate()}
-        disabled={saveMutation.isPending}
+        disabled={saveMutation.isPending || isGridInvalid}
         className="bg-primary text-white font-semibold py-3 px-6 rounded-xl text-sm disabled:opacity-50 hover:bg-primary-dark transition-colors"
       >
         {saveMutation.isPending ? 'Saving…' : 'Save Pricing'}
@@ -112,12 +124,12 @@ function RateGridEditor({ courtId, initialRates }: { courtId: string; initialRat
 export function AdminPricing() {
   const [pickedCourtId, setPickedCourtId] = useState<string | null>(null);
 
-  const { data: courts = [] } = useQuery<Court[]>({ queryKey: ['courts'], queryFn: getCourts });
+  const { data: courts = [] } = useQuery<Court[]>({ queryKey: ['courts'], queryFn: getCourts, refetchInterval: 15_000 });
 
   // Default to the first court until the admin picks one
   const selectedCourtId = pickedCourtId ?? courts[0]?.id ?? '';
 
-  const { data: rates } = useQuery<PriceRate[]>({
+  const { data: rates, isLoading: ratesLoading } = useQuery<PriceRate[]>({
     queryKey: ['admin-pricing', selectedCourtId],
     queryFn: () => adminGetPricing(selectedCourtId),
     enabled: !!selectedCourtId,
@@ -161,6 +173,15 @@ export function AdminPricing() {
           </div>
 
           {/* Keyed by court so switching courts always shows that court's saved rates */}
+          {ratesLoading && (
+            <div className="bg-surface rounded-xl border border-surface-high p-4 mb-5 animate-pulse">
+              <div className="grid grid-cols-2 gap-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-20 bg-gray-100 rounded-xl" />
+                ))}
+              </div>
+            </div>
+          )}
           {rates && <RateGridEditor key={selectedCourt.id} courtId={selectedCourt.id} initialRates={rates} />}
         </>
       )}

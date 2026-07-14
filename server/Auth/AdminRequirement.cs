@@ -7,10 +7,9 @@ namespace TennisBooking.Auth;
 public class AdminRequirement : IAuthorizationRequirement;
 
 /// <summary>
-/// Admin access = role claim "admin" in the JWT (customised Clerk token, used
-/// by the integration tests) OR Role=Admin on the Users table, which is the
-/// source of truth per CLAUDE.md. The DB path means no Clerk dashboard
-/// configuration is required to grant admin.
+/// Admin access = Role=Admin on the Users table — the sole source of truth per
+/// CLAUDE.md ("no second auth stack"). No JWT claim is consulted; this means no
+/// Clerk dashboard configuration is required to grant admin.
 /// </summary>
 public class AdminAuthorizationHandler(AppDbContext db) : AuthorizationHandler<AdminRequirement>
 {

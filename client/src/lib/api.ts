@@ -59,8 +59,11 @@ export const adminGetBlackouts = (courtId?: string) =>
 export const adminCreateBlackout = (data: object) =>
   api.post('/admin/blackouts', data).then(r => r.data);
 export const adminDeleteBlackout = (id: string) => api.delete(`/admin/blackouts/${id}`);
+export const adminGetBlackoutConflicts = (courtId: string, start: string, end: string) =>
+  api.get('/admin/blackouts/conflicts', { params: { courtId, start, end } }).then(r => r.data);
 export const createCourt = (data: object) => api.post('/courts', data).then(r => r.data);
 export const updateCourt = (id: string, data: object) => api.put(`/courts/${id}`, data).then(r => r.data);
 export const adminGetCourts = () => api.get('/admin/courts').then(r => r.data);
 export const adminToggleCourt = (id: string, active: boolean) =>
   api.patch(`/admin/courts/${id}/active`, { active });
+export const deleteCourt = (id: string) => api.delete(`/courts/${id}`);

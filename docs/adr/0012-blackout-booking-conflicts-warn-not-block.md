@@ -1,0 +1,7 @@
+# Blackout/booking conflicts: warn, don't block or auto-cancel
+
+A Blackout can be created over a time window that already contains active, paid Bookings — the availability grid prioritizes `BlackedOut` status over `Booked`, so the slot silently stops showing as booked once a blackout covers it, even though the underlying Booking (and the customer's confirmed slot) is untouched.
+
+We considered three options: (1) hard-block blackout creation when it overlaps active bookings, (2) warn the admin with the list of affected bookings but let them proceed, (3) auto-cancel-and-refund affected bookings when the blackout is saved. We chose (2): `GET /api/admin/blackouts/conflicts` returns overlapping active bookings (player + slot times) before save, the admin UI shows a confirmation listing them, and the admin can proceed regardless. Rejected (1) because a legitimate use case exists (admin wants to reserve the visual "blacked out" state now and handle the booking separately, e.g. a phone call to the customer already in progress). Rejected (3) because auto-cancelling and refunding money without an explicit, separate admin action is too aggressive for a warning-level conflict — cancellation should remain a deliberate act via the Bookings admin page.
+
+Consequence: a blacked-out slot with an untouched Booking underneath is a valid, expected state in this system, not a bug — the admin who chose to proceed accepted the responsibility to handle the affected booking manually.

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminGetBookings, adminCancelBooking } from '../../lib/api';
+import { adminGetBookings, adminCancelBooking, apiErrorMessage } from '../../lib/api';
 import type { AdminBooking } from '../../types';
 import { formatDateTime, formatPrice } from '../../lib/utils';
 
@@ -21,7 +21,16 @@ export function AdminBookings() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [date, setDate] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+  const [cancelId, setCancelId] = useState<string | null>(null);
+  const [cancelErrorId, setCancelErrorId] = useState<string | null>(null);
+
+  // Debounce free-text search so we don't hit the API on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const { data, isLoading } = useQuery<{ total: number; items: AdminBooking[] }>({
     queryKey: ['admin-bookings', page, date, search],
@@ -31,11 +40,17 @@ export function AdminBookings() {
       ...(date ? { date } : {}),
       ...(search ? { search } : {}),
     }),
+    refetchInterval: 15_000,
   });
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => adminCancelBooking(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-bookings'] }),
+    onMutate: (id: string) => { setCancelId(id); setCancelErrorId(null); },
+    onSuccess: () => {
+      setCancelId(null);
+      qc.invalidateQueries({ queryKey: ['admin-bookings'] });
+    },
+    onError: (_e, id) => { setCancelId(null); setCancelErrorId(id); },
   });
 
   const bookings = data?.items ?? [];
@@ -69,13 +84,13 @@ export function AdminBookings() {
             type="text"
             placeholder="Name or email…"
             className="border border-outline-variant rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
           />
         </div>
-        {(date || search) && (
+        {(date || searchInput) && (
           <button
-            onClick={() => { setDate(''); setSearch(''); setPage(1); }}
+            onClick={() => { setDate(''); setSearchInput(''); setSearch(''); setPage(1); }}
             className="text-sm text-on-surface-muted hover:text-on-surface py-2 px-3 border border-outline-variant rounded-lg"
           >
             Clear
@@ -125,11 +140,16 @@ export function AdminBookings() {
                             cancelMutation.mutate(b.id);
                           }
                         }}
-                        disabled={cancelMutation.isPending}
+                        disabled={cancelMutation.isPending && cancelId === b.id}
                         className="text-xs font-medium text-red-600 hover:text-red-800 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 transition-colors disabled:opacity-50"
                       >
-                        Cancel & Refund
+                        {cancelMutation.isPending && cancelId === b.id ? 'Cancelling…' : 'Cancel & Refund'}
                       </button>
+                    )}
+                    {cancelErrorId === b.id && (
+                      <p className="text-[11px] text-red-600 font-medium mt-1">
+                        {apiErrorMessage(cancelMutation.error, 'Failed to cancel booking.')}
+                      </p>
                     )}
                   </div>
                 </div>

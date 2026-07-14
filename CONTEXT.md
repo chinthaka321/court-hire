@@ -7,7 +7,7 @@ Single-tenant, single-complex tennis court booking system. Courts are booked by 
 ### Scheduling
 
 **Court**:
-A physical tennis court that can be booked. Has opening hours, a slot length, a day/night boundary, and an active flag.
+A physical tennis court that can be booked. Has opening hours, a slot length, a day/night boundary, and an active flag. The only lifecycle state that matters is `active`/`inactive` — "deleting" a court is not a domain concept, just an admin utility for removing a court created by mistake before it has any Bookings or Holds. A court with any booking history can never be deleted, only deactivated.
 _Avoid_: facility, resource, lane
 
 **Slot**:
@@ -31,7 +31,7 @@ The computed set of bookable slots for a court on a given day: full time grid mi
 _Avoid_: calendar, schedule, open slots
 
 **Blackout**:
-An admin-defined interval during which a court is unavailable. Subtracted from the availability grid at read time.
+An admin-defined interval during which a court is unavailable. Subtracted from the availability grid at read time. A Blackout does not cancel or touch existing Bookings inside its window — it can overlap paid Bookings, which then simply stop appearing in the availability grid (shown as blacked-out) while the Booking itself is untouched. The admin is warned about such conflicts at creation time but may proceed anyway (see ADR-0012).
 _Avoid_: block, closure, maintenance window
 
 **Day/night boundary**:
@@ -73,12 +73,16 @@ A confirmed reservation. Exists only after payment is settled — either a `paym
 _Avoid_: reservation, appointment, confirmed slot
 
 **Booking state**:
-The lifecycle state of a Booking: `completed`, `cancelled`, or `no_show`.
+The lifecycle state of a Booking: `completed`, `cancelled`, or `no_show`. Despite the name, `completed` means "payment confirmed," not "the match was played" — it's set at creation and covers a Booking's entire active lifetime, past or future, until cancelled. `no_show` is a reserved placeholder: no code path sets it in V1 (no-show strikes are deferred to V2 per `CLAUDE.md`).
 _Avoid_: status, booking status
 
 **Cancellation window**:
 The admin-configured period before a slot start within which a user may cancel for a full refund. Outside this window, no refund is issued.
 _Avoid_: refund window, cancellation period
+
+**Reschedule**:
+Moving a Booking to a new start time as an atomic slot swap: same court (permanent constraint, not a V1 gap — cross-court reschedule is not planned), same slot count, and the new span's total price must exactly equal the original `amount_charged`. No money moves. If the new time's price differs, the user must cancel (per the Cancellation window) and rebook instead. See ADR-0004.
+_Avoid_: rebook, move booking, change time
 
 ### Packages
 

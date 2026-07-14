@@ -16,6 +16,7 @@ export function MyBookings() {
     queryKey: ['my-bookings'],
     queryFn: getMyBookings,
     enabled: !!user,
+    refetchInterval: 15_000,
   });
 
   const cancelMutation = useMutation({

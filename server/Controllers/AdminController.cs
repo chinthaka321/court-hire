@@ -75,6 +75,26 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
         return Ok(result);
     }
 
+    // Bookings that would be silently hidden by a blackout over this window — see ADR-0012.
+    [HttpGet("blackouts/conflicts")]
+    public async Task<IActionResult> GetBlackoutConflicts([FromQuery] Guid courtId, [FromQuery] DateTime start, [FromQuery] DateTime end)
+    {
+        var rangeStart = start.ToUniversalTime();
+        var rangeEnd = end.ToUniversalTime();
+
+        var candidates = await db.Bookings
+            .Where(b => b.CourtId == courtId && b.State != BookingState.Cancelled)
+            .Include(b => b.User)
+            .ToListAsync();
+
+        var conflicts = candidates
+            .Where(b => b.SlotStarts.Any(s => s < rangeEnd && s.AddMinutes(30) > rangeStart))
+            .Select(b => new { b.Id, b.SlotStarts, User = new { b.User.Email, b.User.Name } })
+            .ToList();
+
+        return Ok(conflicts);
+    }
+
     [HttpPost("blackouts")]
     public async Task<IActionResult> CreateBlackout([FromBody] CreateBlackoutRequest req)
     {

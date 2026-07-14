@@ -49,16 +49,19 @@ export function AdminDashboard() {
   const { data: courts = [] } = useQuery<Court[]>({
     queryKey: ['admin-courts'],
     queryFn: adminGetCourts,
+    refetchInterval: 15_000,
   });
 
   const { data: todayData } = useQuery({
     queryKey: ['admin-bookings', 'today', today],
     queryFn: () => adminGetBookings({ date: today, page: 1, pageSize: 50 }),
+    refetchInterval: 15_000,
   });
 
   const { data: recentData } = useQuery({
     queryKey: ['admin-bookings', 'recent'],
     queryFn: () => adminGetBookings({ page: 1, pageSize: 8 }),
+    refetchInterval: 15_000,
   });
 
   const todayBookings: AdminBooking[] = todayData?.items ?? [];
