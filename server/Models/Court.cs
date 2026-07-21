@@ -4,6 +4,16 @@ public class OpeningHours
 {
     public TimeOnly Open { get; set; }
     public TimeOnly Close { get; set; }
+
+    /// <summary>
+    /// Close as a UTC instant on the given day. A close of 00:00 means
+    /// "open until midnight", i.e. the start of the NEXT day — without this,
+    /// close would always precede open and the court would have no slots.
+    /// </summary>
+    public DateTime CloseUtc(DateOnly day) =>
+        Close == TimeOnly.MinValue
+            ? day.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc)
+            : day.ToDateTime(Close, DateTimeKind.Utc);
 }
 
 public class Court

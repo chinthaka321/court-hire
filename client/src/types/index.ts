@@ -1,4 +1,4 @@
-export type SlotStatus = 'Available' | 'Held' | 'Booked' | 'Past' | 'BlackedOut';
+export type SlotStatus = 'Available' | 'Held' | 'Booked' | 'Past' | 'BlackedOut' | 'BeyondHorizon';
 export type BookingState = 'Completed' | 'Cancelled' | 'NoShow';
 export type DayType = 'Weekday' | 'Weekend';
 export type PriceBand = 'Day' | 'Night';
@@ -19,6 +19,8 @@ export interface SlotInfo {
   slotEnd: string;
   status: SlotStatus;
   price: number;
+  /** True when the active Hold on this slot belongs to the requesting user. */
+  heldByMe?: boolean;
 }
 
 export interface Hold {

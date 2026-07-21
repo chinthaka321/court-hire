@@ -1,14 +1,16 @@
-import { useUser, RedirectToSignIn } from '@clerk/clerk-react';
+import { RedirectToSignIn } from '@clerk/clerk-react';
 import { Navigate } from 'react-router-dom';
+import { useMe } from '../hooks/useMe';
 
 export function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoaded } = useUser();
+  // Admin status comes from the app's own users table via /api/me — the same
+  // source of truth the server's AdminOnly policy checks (#33). Clerk metadata
+  // is never consulted: nothing in the system maintains it.
+  const { isLoading, isSignedIn, isAdmin } = useMe();
 
-  if (!isLoaded) return <div className="p-8 text-center text-on-surface-muted">Loading…</div>;
-  if (!user) return <RedirectToSignIn />;
-
-  const role = user.publicMetadata?.role as string | undefined;
-  if (role !== 'admin') return <Navigate to="/" replace />;
+  if (isLoading) return <div className="p-8 text-center text-on-surface-muted">Loading…</div>;
+  if (!isSignedIn) return <RedirectToSignIn />;
+  if (!isAdmin) return <Navigate to="/" replace />;
 
   return <>{children}</>;
 }

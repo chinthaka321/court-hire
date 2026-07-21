@@ -10,7 +10,7 @@ namespace TennisBooking.Controllers;
 [ApiController]
 [Route("api/admin")]
 [Authorize(Policy = "AdminOnly")]
-public class AdminController(AppDbContext db, BookingService bookingService, StripeRefundService refundService, EmailService emailService) : ControllerBase
+public class AdminController(AppDbContext db, BookingService bookingService, StripeRefundService refundService, EmailService emailService, ILogger<AdminController> logger) : ControllerBase
 {
     // Courts (admin view — includes inactive)
     [HttpGet("courts")]
@@ -101,6 +101,11 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
     [HttpPost("blackouts")]
     public async Task<IActionResult> CreateBlackout([FromBody] CreateBlackoutRequest req)
     {
+        if (req.End <= req.Start)
+        {
+            return BadRequest(new { error = "Blackout end must be after its start." });
+        }
+
         var blackout = new Blackout
         {
             Id = Guid.NewGuid(),
@@ -131,11 +136,13 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
         [FromQuery] DateOnly? date,
         [FromQuery] string? userId,
         [FromQuery] string? search,
+        [FromQuery] BookingState? state,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50)
     {
         var query = db.Bookings.AsQueryable();
 
+        if (state.HasValue) query = query.Where(b => b.State == state.Value);
         if (courtId.HasValue) query = query.Where(b => b.CourtId == courtId.Value);
         if (userId is not null) query = query.Where(b => b.UserId == userId);
         if (search is not null)
@@ -184,8 +191,17 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
 
         if (!string.IsNullOrEmpty(booking.StripePaymentIntentId))
         {
-            booking.StripeRefundId = await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
-            await db.SaveChangesAsync();
+            try
+            {
+                booking.StripeRefundId = await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
+                await db.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Refund failed for admin-cancelled booking {BookingId} (paymentIntent {PaymentIntent})", id, booking.StripePaymentIntentId);
+                await emailService.SendBookingCancelledAsync(booking);
+                return StatusCode(502, new { error = "The booking was cancelled, but the Stripe refund failed. Issue the refund manually in the Stripe dashboard (payment intent " + booking.StripePaymentIntentId + ")." });
+            }
         }
 
         await emailService.SendBookingCancelledAsync(booking);

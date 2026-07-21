@@ -53,7 +53,9 @@ export function AdminDashboard() {
 
   const { data: todayData } = useQuery({
     queryKey: ['admin-bookings', 'today', today],
-    queryFn: () => adminGetBookings({ date: today, page: 1, pageSize: 50 }),
+    // Completed only: a cancelled/refunded booking is neither a booking to
+    // fulfil today nor revenue received (#27)
+    queryFn: () => adminGetBookings({ date: today, page: 1, pageSize: 50, state: 'Completed' }),
   });
 
   const { data: recentData } = useQuery({

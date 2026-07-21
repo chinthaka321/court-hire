@@ -46,7 +46,19 @@ public class UserService(AppDbContext db)
         if (principal.HasClaim("role", "admin"))
             user.Role = UserRole.Admin;
 
-        await db.SaveChangesAsync();
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // Two first-login requests raced the insert; the other one won.
+            // Fall back to the committed row instead of surfacing a 500 (#35).
+            db.ChangeTracker.Clear();
+            user = await db.Users.FindAsync(sub)
+                ?? throw new InvalidOperationException("User row vanished after concurrent insert");
+        }
+
         return user;
     }
 }

@@ -9,7 +9,7 @@ namespace TennisBooking.Controllers;
 [ApiController]
 [Route("api/holds")]
 [Authorize]
-public class HoldsController(BookingService booking, UserService userService, IConfiguration config, IWebHostEnvironment env) : ControllerBase
+public class HoldsController(BookingService booking, UserService userService, IConfiguration config, IWebHostEnvironment env, ILogger<HoldsController> logger) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateHoldRequest req)
@@ -50,8 +50,21 @@ public class HoldsController(BookingService booking, UserService userService, IC
                 Metadata = new Dictionary<string, string> { ["holdGroupId"] = holdGroup.HoldGroupId.ToString() }
             };
 
-            var service = new SessionService();
-            var session = await service.CreateAsync(options);
+            Session session;
+            try
+            {
+                var service = new SessionService();
+                session = await service.CreateAsync(options);
+            }
+            catch (Exception ex)
+            {
+                // Don't leave the just-created hold locking the slot for the full
+                // TTL when no checkout ever started (#28) — release it so the
+                // user can retry immediately.
+                logger.LogError(ex, "Stripe checkout-session creation failed for hold group {HoldGroupId}", holdGroup.HoldGroupId);
+                await booking.ReleaseHoldGroupAsync(holdGroup.HoldGroupId);
+                return StatusCode(502, new { error = "Payment couldn't be started — please try again." });
+            }
 
             await booking.UpdateHoldGroupSessionAsync(holdGroup.HoldGroupId, session.Id);
 

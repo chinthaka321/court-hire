@@ -8,7 +8,7 @@ export function BookingConfirmed() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data: bookings = [] } = useQuery<Booking[]>({
+  const { data: bookings = [], isLoading, isError } = useQuery<Booking[]>({
     queryKey: ['my-bookings'],
     queryFn: getMyBookings,
   });
@@ -26,6 +26,24 @@ export function BookingConfirmed() {
 
       <h1 className="text-2xl font-bold text-on-surface">Booking Confirmed!</h1>
       <p className="text-sm text-on-surface-muted mt-2">A confirmation email has been sent to you.</p>
+
+      {isLoading && (
+        <div className="mt-8 bg-white rounded-2xl border border-surface-high divide-y divide-[#f0f0f0] animate-pulse">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center justify-between px-5 py-3.5">
+              <div className="h-4 w-20 bg-gray-100 rounded" />
+              <div className="h-4 w-28 bg-gray-100 rounded" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(isError || (!isLoading && !booking)) && (
+        <div className="mt-8 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800 font-medium text-left">
+          Your booking is confirmed, but we couldn't load its details right now.
+          You can see the full details under My Bookings.
+        </div>
+      )}
 
       {booking && (
         <div className="mt-8 bg-white rounded-2xl border border-surface-high text-left divide-y divide-[#f0f0f0]">

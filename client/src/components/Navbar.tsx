@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useUser, UserButton, SignInButton } from '@clerk/clerk-react';
+import { useMe } from '../hooks/useMe';
 
 export function Navbar() {
   const { user, isLoaded } = useUser();
   const location = useLocation();
-  const isAdmin = user?.publicMetadata?.role === 'admin';
+  // DB-backed role, matching what the server's AdminOnly policy checks (#33)
+  const { isAdmin } = useMe();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navLinks = [

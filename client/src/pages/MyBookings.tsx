@@ -2,9 +2,17 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser, SignInButton } from '@clerk/clerk-react';
-import { getMyBookings, cancelBooking, apiErrorMessage } from '../lib/api';
+import { getMyBookings, cancelBooking, getConfig, apiErrorMessage } from '../lib/api';
 import { BookingCard } from '../components/BookingCard';
 import type { Booking } from '../types';
+
+// Inside the window → full refund; outside → cancellation still succeeds but
+// no refund (ADR-0005). The dialog must say which BEFORE the user confirms.
+function isWithinRefundWindow(b: Booking, windowHours: number | undefined) {
+  if (windowHours === undefined) return true; // config not loaded — optimistic wording
+  const cutoff = new Date(b.slotStarts[0]).getTime() - windowHours * 3_600_000;
+  return Date.now() <= cutoff;
+}
 
 export function MyBookings() {
   const { user, isLoaded } = useUser();
@@ -17,6 +25,8 @@ export function MyBookings() {
     queryFn: getMyBookings,
     enabled: !!user,
   });
+
+  const { data: config } = useQuery({ queryKey: ['config'], queryFn: getConfig, staleTime: 300_000 });
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => cancelBooking(id),
@@ -91,7 +101,10 @@ export function MyBookings() {
                     key={b.id}
                     booking={b}
                     onCancel={() => {
-                      if (window.confirm('Cancel this booking? A full refund will be issued if within the cancellation window.')) {
+                      const message = isWithinRefundWindow(b, config?.cancellationWindowHours)
+                        ? 'Cancel this booking? A full refund will be issued.'
+                        : `Cancel this booking? The cancellation window (${config?.cancellationWindowHours ?? 24}h before start) has passed — NO refund will be issued.`;
+                      if (window.confirm(message)) {
                         cancelMutation.mutate(b.id);
                       }
                     }}

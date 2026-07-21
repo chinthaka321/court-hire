@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminGetBookings, adminCancelBooking, apiErrorMessage } from '../../lib/api';
+import { adminGetBookings, adminCancelBooking, getConfig, apiErrorMessage } from '../../lib/api';
 import type { AdminBooking } from '../../types';
 import { formatDateTime, formatPrice } from '../../lib/utils';
 
@@ -15,6 +15,15 @@ function StateBadge({ state }: { state: string }) {
       {state === 'NoShow' ? 'No-show' : state}
     </span>
   );
+}
+
+// Admin cancel ALWAYS refunds — flag when that's an override of the normal
+// window so unintended refunds aren't issued silently (#22, ADR-0005).
+function cancelConfirmMessage(b: AdminBooking, windowHours: number) {
+  const outsideWindow = Date.now() > new Date(b.slotStarts[0]).getTime() - windowHours * 3_600_000;
+  return outsideWindow
+    ? `⚠ OVERRIDE: this booking is outside the ${windowHours}h cancellation window — the customer is NOT normally entitled to a refund. Cancel and refund anyway?`
+    : 'Cancel this booking and issue a full refund?';
 }
 
 export function AdminBookings() {
@@ -44,6 +53,8 @@ export function AdminBookings() {
     mutationFn: (id: string) => adminCancelBooking(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-bookings'] }),
   });
+
+  const { data: config } = useQuery({ queryKey: ['config'], queryFn: getConfig, staleTime: 300_000 });
 
   const bookings = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -128,7 +139,7 @@ export function AdminBookings() {
                     {b.state === 'Completed' && (
                       <button
                         onClick={() => {
-                          if (window.confirm('Cancel this booking and issue a full refund?')) {
+                          if (window.confirm(cancelConfirmMessage(b, config?.cancellationWindowHours ?? 24))) {
                             cancelMutation.mutate(b.id);
                           }
                         }}

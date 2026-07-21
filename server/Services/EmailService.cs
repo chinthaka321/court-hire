@@ -69,7 +69,9 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger)
             body);
     }
 
-    public async Task SendBookingReminderAsync(Booking booking)
+    /// <summary>Returns true only if the reminder was actually handed to the mail server —
+    /// the caller must not mark the booking as reminded otherwise (#34).</summary>
+    public async Task<bool> SendBookingReminderAsync(Booking booking)
     {
         var slot = booking.SlotStarts.Min();
         var durationMin = booking.SlotStarts.Count * 30;
@@ -87,20 +89,20 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger)
             Tennis Court Booking
             """;
 
-        await SendAsync(
+        return await SendAsync(
             booking.User.Email,
             booking.User.Name,
             $"Reminder: {booking.Court.Name} tomorrow at {slot:h:mm tt}",
             body);
     }
 
-    private async Task SendAsync(string toAddress, string? toName, string subject, string body)
+    private async Task<bool> SendAsync(string toAddress, string? toName, string subject, string body)
     {
         var s = Settings;
         if (string.IsNullOrEmpty(s.SmtpHost) || s.SmtpHost == "localhost")
         {
             logger.LogInformation("[Email skipped — no SMTP configured] To: {To} Subject: {Subject}", toAddress, subject);
-            return;
+            return true; // dev mode: treat as sent so jobs don't retry forever
         }
 
         try
@@ -119,10 +121,12 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger)
             await client.DisconnectAsync(true);
 
             logger.LogInformation("Email sent to {To}: {Subject}", toAddress, subject);
+            return true;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to send email to {To}: {Subject}", toAddress, subject);
+            return false;
         }
     }
 }

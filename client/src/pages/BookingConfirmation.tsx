@@ -39,7 +39,9 @@ export function BookingConfirmation() {
 
   const isSlotUnavailable = !loadingAvailability && court && availability.length > 0 && slotTimesToCheck.some(timeStr => {
     const s = availability.find(x => new Date(x.slotStart).getTime() === new Date(timeStr).getTime());
-    return !s || s.status !== 'Available';
+    // A slot held by THIS user (e.g. they backed out of Stripe checkout) is
+    // resumable — tapping Pay replaces their own hold with a fresh one (#31).
+    return !s || (s.status !== 'Available' && !(s.status === 'Held' && s.heldByMe));
   });
 
   async function handlePay() {

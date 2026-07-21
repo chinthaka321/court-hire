@@ -4,13 +4,15 @@ using TennisBooking.Models;
 
 namespace TennisBooking.Services;
 
-public enum SlotStatus { Available, Held, Booked, Past, BlackedOut }
+public enum SlotStatus { Available, Held, Booked, Past, BlackedOut, BeyondHorizon }
 
-public record SlotInfo(DateTime SlotStart, DateTime SlotEnd, SlotStatus Status, decimal Price);
+public record SlotInfo(DateTime SlotStart, DateTime SlotEnd, SlotStatus Status, decimal Price, bool HeldByMe = false);
 
-public class AvailabilityService(AppDbContext db, PricingService pricing)
+public class AvailabilityService(AppDbContext db, PricingService pricing, IConfiguration config)
 {
-    public async Task<IReadOnlyList<SlotInfo>> GetAvailabilityAsync(Guid courtId, DateOnly date)
+    private BookingSettings Settings => config.GetSection("Booking").Get<BookingSettings>() ?? new();
+
+    public async Task<IReadOnlyList<SlotInfo>> GetAvailabilityAsync(Guid courtId, DateOnly date, string? requestingUserId = null)
     {
         var court = await db.Courts
             .Include(c => c.PriceRates)
@@ -19,13 +21,14 @@ public class AvailabilityService(AppDbContext db, PricingService pricing)
 
         var slots = GenerateGrid(court, date);
         var now = DateTime.UtcNow;
+        var horizonEnd = now.AddDays(Settings.BookingHorizonDays);
 
         var dayStart = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var dayEnd = dayStart.AddDays(1);
 
         var holds = await db.Holds
             .Where(h => h.CourtId == courtId && h.SlotStart >= dayStart && h.SlotStart < dayEnd && h.ExpiresAt > now)
-            .Select(h => h.SlotStart)
+            .Select(h => new { h.SlotStart, h.UserId })
             .ToListAsync();
 
         var bookedSlotArrays = await db.Bookings
@@ -42,7 +45,10 @@ public class AvailabilityService(AppDbContext db, PricingService pricing)
             .Where(bl => bl.CourtId == courtId && bl.Start < dayEnd && bl.End > dayStart)
             .ToListAsync();
 
-        var heldSet = holds.ToHashSet();
+        var heldSet = holds.Select(h => h.SlotStart).ToHashSet();
+        var heldByMeSet = requestingUserId is null
+            ? []
+            : holds.Where(h => h.UserId == requestingUserId).Select(h => h.SlotStart).ToHashSet();
         var bookedSet = bookedSlots.ToHashSet();
 
         return slots.Select(slotStart =>
@@ -52,6 +58,9 @@ public class AvailabilityService(AppDbContext db, PricingService pricing)
 
             if (slotStart < now)
                 status = SlotStatus.Past;
+            else if (slotStart > horizonEnd)
+                // Keep the grid honest: hold creation would reject these anyway (#30)
+                status = SlotStatus.BeyondHorizon;
             else if (blackouts.Any(bl => bl.Start < slotEnd && bl.End > slotStart))
                 status = SlotStatus.BlackedOut;
             else if (bookedSet.Contains(slotStart))
@@ -72,7 +81,7 @@ public class AvailabilityService(AppDbContext db, PricingService pricing)
                     price = rate.Value;
             }
 
-            return new SlotInfo(slotStart, slotEnd, status, price);
+            return new SlotInfo(slotStart, slotEnd, status, price, heldByMeSet.Contains(slotStart));
         }).ToList();
     }
 
@@ -80,7 +89,7 @@ public class AvailabilityService(AppDbContext db, PricingService pricing)
     {
         var slots = new List<DateTime>();
         var open = date.ToDateTime(court.OpeningHours.Open, DateTimeKind.Utc);
-        var close = date.ToDateTime(court.OpeningHours.Close, DateTimeKind.Utc);
+        var close = court.OpeningHours.CloseUtc(date);
         var current = open;
         while (current.AddMinutes(court.SlotLengthMinutes) <= close)
         {

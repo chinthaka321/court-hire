@@ -17,11 +17,19 @@ export function setAuthToken(token: string | null) {
 /** Extracts the server's `{ error }` message from a failed request, or falls back. */
 export function apiErrorMessage(e: unknown, fallback: string): string {
   if (axios.isAxiosError(e)) {
+    // A bare 401 means the session expired — never blame the slot/action for it (#36)
+    if (e.response?.status === 401) {
+      return 'Your session has expired — please sign in again and retry.';
+    }
     const data = e.response?.data as { error?: string } | undefined;
     if (data?.error) return data.error;
   }
   return fallback;
 }
+
+// Booking policy values (cancellation window etc.) for honest client dialogs
+export const getConfig = () =>
+  api.get('/config').then(r => r.data as { cancellationWindowHours: number; bookingHorizonDays: number; holdTtlMinutes: number });
 
 // Courts
 export const getCourts = () => api.get('/courts').then(r => r.data);

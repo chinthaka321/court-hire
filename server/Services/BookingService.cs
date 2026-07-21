@@ -32,15 +32,18 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
             .Select(i => slotStart.AddMinutes(i * court.SlotLengthMinutes))
             .ToList();
 
-        // Clear any expired holds on these slots before verifying availability or inserting new holds.
-        // This prevents unique constraint violations from stale holds that haven't been swept yet.
+        // Clear holds on these slots that no longer deserve to block this request:
+        // expired-but-unswept holds, and the requesting user's OWN active holds
+        // (an abandoned checkout — e.g. browser-back from Stripe — should be
+        // replaceable by the same user immediately, not lock them out, #31).
         var now = DateTime.UtcNow;
-        var expiredHolds = await db.Holds
-            .Where(h => h.CourtId == courtId && slotStarts.Contains(h.SlotStart) && h.ExpiresAt <= now)
+        var replaceableHolds = await db.Holds
+            .Where(h => h.CourtId == courtId && slotStarts.Contains(h.SlotStart)
+                        && (h.ExpiresAt <= now || h.UserId == userId))
             .ToListAsync();
-        if (expiredHolds.Count > 0)
+        if (replaceableHolds.Count > 0)
         {
-            db.Holds.RemoveRange(expiredHolds);
+            db.Holds.RemoveRange(replaceableHolds);
             await db.SaveChangesAsync();
         }
 
@@ -105,7 +108,13 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
         return booking;
     }
 
-    public async Task CancelBookingAsync(Guid bookingId, string requestingUserId, bool isAdmin = false)
+    /// <summary>
+    /// Cancels a booking. Per ADR-0005: inside the cancellation window the caller
+    /// is owed a full refund; outside it the cancellation still succeeds but no
+    /// refund is due. Admin cancellations always refund. Returns whether a refund
+    /// is owed — the controller performs the actual Stripe refund.
+    /// </summary>
+    public async Task<bool> CancelBookingAsync(Guid bookingId, string requestingUserId, bool isAdmin = false)
     {
         var booking = await db.Bookings
             .Include(b => b.Court)
@@ -119,13 +128,27 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
             throw new InvalidOperationException("Booking is not in a cancellable state");
 
         var earliestSlot = booking.SlotStarts.Min();
-        var withinWindow = DateTime.UtcNow <= earliestSlot.AddHours(-Settings.CancellationWindowHours);
 
-        if (!isAdmin && !withinWindow)
-            throw new InvalidOperationException("The cancellation window has passed — this booking can no longer be cancelled");
+        if (earliestSlot <= DateTime.UtcNow)
+            throw new InvalidOperationException("This booking has already started and can no longer be cancelled");
+
+        var withinWindow = DateTime.UtcNow <= earliestSlot.AddHours(-Settings.CancellationWindowHours);
 
         booking.State = BookingState.Cancelled;
         await db.SaveChangesAsync();
+
+        return isAdmin || withinWindow;
+    }
+
+    /// <summary>Releases an entire hold group immediately (e.g. checkout-session creation failed).</summary>
+    public async Task ReleaseHoldGroupAsync(Guid holdGroupId)
+    {
+        var holds = await db.Holds.Where(h => h.HoldGroupId == holdGroupId).ToListAsync();
+        if (holds.Count > 0)
+        {
+            db.Holds.RemoveRange(holds);
+            await db.SaveChangesAsync();
+        }
     }
 
     public async Task UpdateHoldGroupSessionAsync(Guid holdGroupId, string sessionId)
@@ -184,7 +207,7 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
 
         var day = DateOnly.FromDateTime(first);
         var open = day.ToDateTime(court.OpeningHours.Open, DateTimeKind.Utc);
-        var close = day.ToDateTime(court.OpeningHours.Close, DateTimeKind.Utc);
+        var close = court.OpeningHours.CloseUtc(day);
 
         if (first < open || lastEnd > close)
             throw new InvalidOperationException("Slot is outside the court's opening hours");

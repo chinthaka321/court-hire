@@ -36,20 +36,32 @@ public class CourtsController(AppDbContext db) : ControllerBase
         return court is null ? NotFound() : Ok(court);
     }
 
+    /// <summary>Shared create/update validation. Returns an error message or null.</summary>
+    private static string? ValidateCourtRequest(CreateCourtRequest req)
+    {
+        if (string.IsNullOrWhiteSpace(req.Name))
+            return "Name is required.";
+        if (req.Close != TimeOnly.MinValue && req.Close <= req.Open)
+            return "Close time must be after open time.";
+        if (req.SlotLengthMinutes != 30)
+            return "Slot length must be exactly 30 minutes.";
+
+        // Boundary outside opening hours would make one whole pricing band
+        // unreachable — every slot silently priced from the other band (#25).
+        var boundaryTooEarly = req.DayNightBoundary < req.Open;
+        var boundaryTooLate = req.Close != TimeOnly.MinValue && req.DayNightBoundary > req.Close;
+        if ((boundaryTooEarly && req.DayNightBoundary != TimeOnly.MinValue) || boundaryTooLate)
+            return "Day/night boundary must fall within the opening hours.";
+
+        return null;
+    }
+
     [HttpPost, Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> Create([FromBody] CreateCourtRequest req)
     {
-        if (string.IsNullOrWhiteSpace(req.Name))
+        if (ValidateCourtRequest(req) is string error)
         {
-            return BadRequest(new { error = "Name is required." });
-        }
-        if (req.Close != TimeOnly.MinValue && req.Close <= req.Open)
-        {
-            return BadRequest(new { error = "Close time must be after open time." });
-        }
-        if (req.SlotLengthMinutes != 30)
-        {
-            return BadRequest(new { error = "Slot length must be exactly 30 minutes." });
+            return BadRequest(new { error });
         }
 
         var court = new Court
@@ -71,17 +83,9 @@ public class CourtsController(AppDbContext db) : ControllerBase
     [HttpPut("{id:guid}"), Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> Update(Guid id, [FromBody] CreateCourtRequest req)
     {
-        if (string.IsNullOrWhiteSpace(req.Name))
+        if (ValidateCourtRequest(req) is string error)
         {
-            return BadRequest(new { error = "Name is required." });
-        }
-        if (req.Close != TimeOnly.MinValue && req.Close <= req.Open)
-        {
-            return BadRequest(new { error = "Close time must be after open time." });
-        }
-        if (req.SlotLengthMinutes != 30)
-        {
-            return BadRequest(new { error = "Slot length must be exactly 30 minutes." });
+            return BadRequest(new { error });
         }
 
         var court = await db.Courts.FindAsync(id);

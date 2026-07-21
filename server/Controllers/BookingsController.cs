@@ -9,7 +9,7 @@ namespace TennisBooking.Controllers;
 [ApiController]
 [Route("api/bookings")]
 [Authorize]
-public class BookingsController(AppDbContext db, BookingService bookingService, StripeRefundService refundService, EmailService emailService) : ControllerBase
+public class BookingsController(AppDbContext db, BookingService bookingService, StripeRefundService refundService, EmailService emailService, ILogger<BookingsController> logger) : ControllerBase
 {
     private string UserId => User.FindFirst("sub")!.Value;
 
@@ -54,17 +54,28 @@ public class BookingsController(AppDbContext db, BookingService bookingService, 
 
             if (booking.UserId != UserId) return Forbid();
 
-            await bookingService.CancelBookingAsync(id, UserId);
+            var refundDue = await bookingService.CancelBookingAsync(id, UserId);
 
-            if (!string.IsNullOrEmpty(booking.StripePaymentIntentId))
+            if (refundDue && !string.IsNullOrEmpty(booking.StripePaymentIntentId))
             {
-                booking.StripeRefundId = await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
-                await db.SaveChangesAsync();
+                try
+                {
+                    booking.StripeRefundId = await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
+                    await db.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    // The cancellation is already committed; don't leave the user
+                    // guessing about whether their money is coming back.
+                    logger.LogError(ex, "Refund failed for cancelled booking {BookingId} (paymentIntent {PaymentIntent})", id, booking.StripePaymentIntentId);
+                    await emailService.SendBookingCancelledAsync(booking);
+                    return StatusCode(502, new { error = "Your booking was cancelled, but the refund could not be processed automatically. Our staff have been notified and will issue it manually." });
+                }
             }
 
             await emailService.SendBookingCancelledAsync(booking);
 
-            return NoContent();
+            return Ok(new { refunded = refundDue && !string.IsNullOrEmpty(booking.StripePaymentIntentId) });
         }
         catch (InvalidOperationException ex)
         {

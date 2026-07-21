@@ -292,6 +292,9 @@ export function BookingCalendar() {
                 <SlotCell
                   key={slot.slotStart}
                   slot={slot}
+                  // Same-price swap only (ADR-0004): grey out targets that can
+                  // never succeed instead of failing after the tap (#29)
+                  priceMismatch={!!rescheduling && slot.status === 'Available' && slot.price !== rescheduling.amountCharged}
                   onClick={() => handleSlotTap(slot)}
                 />
               ))}

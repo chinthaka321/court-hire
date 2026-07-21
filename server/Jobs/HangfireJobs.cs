@@ -41,12 +41,19 @@ public class SendReminderEmailsJob(AppDbContext db, EmailService email, IConfigu
 
         foreach (var booking in upcoming)
         {
-            await email.SendBookingReminderAsync(booking);
-            booking.ReminderSent = true;
-            logger.LogInformation("Reminder sent for booking {Id} to {User}", booking.Id, booking.User.Email);
+            // Mark-and-save per booking, and only on a successful send (#34):
+            // a mail outage must mean "retry next run", not silent permanent skip,
+            // and a failed batch save must not re-send already-delivered reminders.
+            if (await email.SendBookingReminderAsync(booking))
+            {
+                booking.ReminderSent = true;
+                await db.SaveChangesAsync();
+                logger.LogInformation("Reminder sent for booking {Id} to {User}", booking.Id, booking.User.Email);
+            }
+            else
+            {
+                logger.LogWarning("Reminder send failed for booking {Id}; will retry on next run", booking.Id);
+            }
         }
-
-        if (upcoming.Count > 0)
-            await db.SaveChangesAsync();
     }
 }
