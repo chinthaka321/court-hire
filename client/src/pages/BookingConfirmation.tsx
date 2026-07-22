@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { getCourt, getAvailability, createHold, apiErrorMessage } from '../lib/api';
+import { getCourt, getAvailability, createHold, adminCreateBooking, apiErrorMessage } from '../lib/api';
 import type { Court, SlotInfo } from '../types';
 import { formatDateTime, formatPrice } from '../lib/utils';
+import { useMe } from '../hooks/useMe';
 
 export function BookingConfirmation() {
   const { courtId, slotStart } = useParams<{ courtId: string; slotStart: string }>();
@@ -12,6 +13,8 @@ export function BookingConfirmation() {
   const price = parseFloat(searchParams.get('price') ?? '0');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notes, setNotes] = useState('');
+  const { isAdmin } = useMe();
 
   const slotDate = decodeURIComponent(slotStart!);
   const slotCount = parseInt(searchParams.get('slotCount') ?? '2');
@@ -24,12 +27,16 @@ export function BookingConfirmation() {
   const durationMinutes = court ? slotCount * court.slotLengthMinutes : 30;
   const slotEnd = new Date(new Date(slotDate).getTime() + durationMinutes * 60_000).toISOString();
 
-  // Fetch real-time availability to make sure the slot isn't already booked/held
+  // Fetch real-time availability to make sure the slot isn't already booked/held.
+  // This is the last line of defense before payment, so it must never reuse the
+  // list page's cached snapshot (which can be up to staleTime old) — always refetch.
   const dateOnlyString = slotDate.split('T')[0];
   const { data: availability = [], isLoading: loadingAvailability } = useQuery<SlotInfo[]>({
     queryKey: ['availability', courtId, dateOnlyString],
     queryFn: () => getAvailability(courtId!, dateOnlyString),
     enabled: !!courtId && !!court,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const baseLength = court?.slotLengthMinutes ?? 30;
@@ -48,6 +55,13 @@ export function BookingConfirmation() {
     setLoading(true);
     setError(null);
     try {
+      if (isAdmin) {
+        // Admins book on behalf of walk-in customers paying in person —
+        // create the booking directly, skipping Stripe checkout entirely.
+        await adminCreateBooking({ courtId: courtId!, slotStart: slotDate, slotCount, notes: notes || undefined });
+        navigate('/admin/bookings');
+        return;
+      }
       const { checkoutUrl } = await createHold(courtId!, slotDate, slotCount);
       window.location.href = checkoutUrl;
     } catch (e: unknown) {
@@ -86,6 +100,25 @@ export function BookingConfirmation() {
         <span className="text-2xl font-bold text-primary">{price ? formatPrice(price) : '—'}</span>
       </div>
 
+      {isAdmin && (
+        <div className="bg-white rounded-xl border border-surface-high p-4 mb-4">
+          <label htmlFor="admin-notes" className="block text-xs font-semibold text-on-surface-muted mb-1.5">
+            Description (admin only)
+          </label>
+          <input
+            id="admin-notes"
+            type="text"
+            placeholder="e.g. Booked for John Smith, walk-in cash payment"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            className="w-full border border-surface-high rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <p className="text-xs text-on-surface-muted mt-2">
+            Booking as admin skips online checkout — the slot is booked immediately for a customer paying in person.
+          </p>
+        </div>
+      )}
+
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3.5 text-sm text-red-700 font-medium">
           {error}
@@ -99,16 +132,24 @@ export function BookingConfirmation() {
         </div>
       )}
 
-      <p className="text-xs font-semibold text-on-surface-muted text-center mb-6 max-w-sm mx-auto leading-normal">
-        ⚠️ Viewing this page does not lock the slot. The court is only reserved for 7 minutes once you click &quot;Pay Now&quot; to proceed.
-      </p>
+      {!isAdmin && (
+        <p className="text-xs font-semibold text-on-surface-muted text-center mb-6 max-w-sm mx-auto leading-normal">
+          ⚠️ Viewing this page does not lock the slot. The court is only reserved for 7 minutes once you click &quot;Pay Now&quot; to proceed.
+        </p>
+      )}
 
       <button
         onClick={handlePay}
         disabled={loading || loadingAvailability || isSlotUnavailable}
         className="w-full bg-primary text-white font-semibold py-3.5 rounded-xl text-base hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
       >
-        {loading ? 'Please wait…' : isSlotUnavailable ? 'Slot Unavailable' : <>Pay Now <span className="text-lg">›</span></>}
+        {loading
+          ? 'Please wait…'
+          : isSlotUnavailable
+            ? 'Slot Unavailable'
+            : isAdmin
+              ? <>Create Booking <span className="text-lg">›</span></>
+              : <>Pay Now <span className="text-lg">›</span></>}
       </button>
     </div>
   );

@@ -38,6 +38,7 @@ export interface Booking {
   slotStarts: string[];
   createdAt: string;
   court: { id: string; name: string };
+  notes?: string | null;
 }
 
 /** Booking as returned by the admin endpoints — includes the customer. */

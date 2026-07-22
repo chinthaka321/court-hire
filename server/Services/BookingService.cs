@@ -14,29 +14,19 @@ public class BookingSettings
 
 public record HoldGroup(Guid HoldGroupId, decimal TotalPrice, int DurationMinutes);
 
-public class BookingService(AppDbContext db, PricingService pricing, IConfiguration config)
+public class BookingService(AppDbContext db, PricingService pricing, IConfiguration config, CourtClock clock)
 {
     private BookingSettings Settings => config.GetSection("Booking").Get<BookingSettings>() ?? new();
 
     public async Task<HoldGroup> CreateHoldAsync(Guid courtId, DateTime slotStart, string userId, int slotCount = 1)
     {
-        if (slotCount < 1 || slotCount > 4)
-            throw new InvalidOperationException("Slot count must be between 1 and 4");
-
-        var court = await db.Courts
-            .Include(c => c.PriceRates)
-            .FirstOrDefaultAsync(c => c.Id == courtId && c.Active)
-            ?? throw new KeyNotFoundException("Court not found");
-
-        var slotStarts = Enumerable.Range(0, slotCount)
-            .Select(i => slotStart.AddMinutes(i * court.SlotLengthMinutes))
-            .ToList();
+        var (court, slotStarts) = await PrepareSlotsAsync(courtId, slotStart, slotCount);
 
         // Clear holds on these slots that no longer deserve to block this request:
         // expired-but-unswept holds, and the requesting user's OWN active holds
         // (an abandoned checkout — e.g. browser-back from Stripe — should be
         // replaceable by the same user immediately, not lock them out, #31).
-        var now = DateTime.UtcNow;
+        var now = clock.Now();
         var replaceableHolds = await db.Holds
             .Where(h => h.CourtId == courtId && slotStarts.Contains(h.SlotStart)
                         && (h.ExpiresAt <= now || h.UserId == userId))
@@ -52,7 +42,7 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
         // Create one Hold row per slot, all sharing the same HoldGroupId.
         // The DB UNIQUE(CourtId, SlotStart) constraint is the concurrency backstop.
         var holdGroupId = Guid.NewGuid();
-        var expiresAt = DateTime.UtcNow.AddMinutes(Settings.HoldTtlMinutes);
+        var expiresAt = now.AddMinutes(Settings.HoldTtlMinutes);
         var totalPrice = 0m;
 
         foreach (var slot in slotStarts)
@@ -73,6 +63,30 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
 
         await db.SaveChangesAsync();
         return new HoldGroup(holdGroupId, totalPrice, slotCount * court.SlotLengthMinutes);
+    }
+
+    /// <summary>Admin-only walk-in booking: created directly as Completed, no Hold/Stripe involved.</summary>
+    public async Task<Booking> CreateAdminBookingAsync(Guid courtId, DateTime slotStart, int slotCount, string adminUserId, string? notes)
+    {
+        var (court, slotStarts) = await PrepareSlotsAsync(courtId, slotStart, slotCount);
+
+        await EnsureSlotsBookableAsync(court, slotStarts);
+
+        var booking = new Booking
+        {
+            Id = Guid.NewGuid(),
+            CourtId = courtId,
+            SlotStarts = slotStarts,
+            UserId = adminUserId,
+            AmountCharged = slotStarts.Sum(s => pricing.GetPrice(court, s)),
+            State = BookingState.Completed,
+            Notes = notes,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        db.Bookings.Add(booking);
+        await db.SaveChangesAsync();
+        return booking;
     }
 
     public async Task<Booking> ConfirmBookingAsync(string? stripePaymentIntentId, Guid holdGroupId)
@@ -129,10 +143,11 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
 
         var earliestSlot = booking.SlotStarts.Min();
 
-        if (earliestSlot <= DateTime.UtcNow)
+        var now = clock.Now();
+        if (earliestSlot <= now)
             throw new InvalidOperationException("This booking has already started and can no longer be cancelled");
 
-        var withinWindow = DateTime.UtcNow <= earliestSlot.AddHours(-Settings.CancellationWindowHours);
+        var withinWindow = now <= earliestSlot.AddHours(-Settings.CancellationWindowHours);
 
         booking.State = BookingState.Cancelled;
         await db.SaveChangesAsync();
@@ -193,9 +208,26 @@ public class BookingService(AppDbContext db, PricingService pricing, IConfigurat
         await db.SaveChangesAsync();
     }
 
+    private async Task<(Court Court, List<DateTime> SlotStarts)> PrepareSlotsAsync(Guid courtId, DateTime slotStart, int slotCount)
+    {
+        if (slotCount < 1 || slotCount > 4)
+            throw new InvalidOperationException("Slot count must be between 1 and 4");
+
+        var court = await db.Courts
+            .Include(c => c.PriceRates)
+            .FirstOrDefaultAsync(c => c.Id == courtId && c.Active)
+            ?? throw new KeyNotFoundException("Court not found");
+
+        var slotStarts = Enumerable.Range(0, slotCount)
+            .Select(i => slotStart.AddMinutes(i * court.SlotLengthMinutes))
+            .ToList();
+
+        return (court, slotStarts);
+    }
+
     private async Task EnsureSlotsBookableAsync(Court court, List<DateTime> slotStarts, Guid? excludeBookingId = null)
     {
-        var now = DateTime.UtcNow;
+        var now = clock.Now();
         var first = slotStarts[0];
         var lastEnd = slotStarts[^1].AddMinutes(court.SlotLengthMinutes);
 

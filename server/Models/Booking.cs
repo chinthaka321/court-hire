@@ -17,4 +17,5 @@ public class Booking
     public string? StripeRefundId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public bool ReminderSent { get; set; }
+    public string? Notes { get; set; } // admin-only free text (e.g. walk-in customer note)
 }

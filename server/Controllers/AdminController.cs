@@ -162,13 +162,32 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(b => new {
-                b.Id, b.State, b.AmountCharged, b.SlotStarts, b.CreatedAt,
+                b.Id, b.State, b.AmountCharged, b.SlotStarts, b.CreatedAt, b.Notes,
                 Court = new { b.Court.Id, b.Court.Name },
                 User  = new { b.User.Id, b.User.Email, b.User.Name }
             })
             .ToListAsync();
 
         return Ok(new { total, items });
+    }
+
+    [HttpPost("bookings")]
+    public async Task<IActionResult> CreateAdminBooking([FromBody] CreateAdminBookingRequest req)
+    {
+        var adminUserId = User.FindFirst("sub")?.Value
+            ?? throw new UnauthorizedAccessException();
+
+        try
+        {
+            var booking = await bookingService.CreateAdminBookingAsync(
+                req.CourtId, req.SlotStart.ToUniversalTime(), req.SlotCount, adminUserId, req.Notes);
+            return Ok(new {
+                booking.Id, booking.State, booking.AmountCharged, booking.SlotStarts,
+                booking.Notes, booking.CreatedAt, CourtId = req.CourtId
+            });
+        }
+        catch (KeyNotFoundException ex) { return NotFound(new { error = ex.Message }); }
+        catch (InvalidOperationException ex) { return Conflict(new { error = ex.Message }); }
     }
 
     [HttpDelete("bookings/{id:guid}")]
@@ -213,3 +232,4 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
 public record UpsertRateRequest(DayType DayType, PriceBand Band, decimal Price);
 public record CreateBlackoutRequest(Guid CourtId, DateTime Start, DateTime End, string? Reason);
 public record SetActiveRequest(bool Active);
+public record CreateAdminBookingRequest(Guid CourtId, DateTime SlotStart, int SlotCount, string? Notes);
