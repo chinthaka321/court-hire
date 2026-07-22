@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminGetCourts, adminToggleCourt, createCourt, updateCourt, deleteCourt, apiErrorMessage } from '../../lib/api';
 import type { Court } from '../../types';
+import { Button } from '../../components/ui/Button';
+import { Input, Field } from '../../components/ui/Input';
 
 interface CourtForm {
   name: string;
@@ -13,14 +15,11 @@ interface CourtForm {
 
 const blank: CourtForm = { name: '', open: '07:00', close: '22:00', slotLengthMinutes: 30, dayNightBoundary: '18:00' };
 
-const inputCls = 'w-full border border-gray-200 rounded-xl px-4.5 py-3 text-sm focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all bg-white';
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function WarningIcon() {
   return (
-    <div>
-      <label className="block text-xs font-bold text-on-surface-muted uppercase tracking-wider mb-2">{label}</label>
-      {children}
-    </div>
+    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 shrink-0" aria-hidden="true">
+      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.486 0l6.28 11.19c.75 1.334-.213 2.98-1.744 2.98H3.72c-1.53 0-2.493-1.646-1.744-2.98l6.28-11.19zM11 14a1 1 0 11-2 0 1 1 0 012 0zm-.25-6.5a.75.75 0 00-1.5 0v3a.75.75 0 001.5 0v-3z" clipRule="evenodd" />
+    </svg>
   );
 }
 
@@ -106,12 +105,9 @@ export function AdminCourts() {
           <p className="text-sm text-on-surface-muted mt-1">Configure operating hours, slot base unit, and pricing bands</p>
         </div>
         {!showForm && (
-          <button
-            onClick={() => { setEditing(null); setForm(blank); setShowForm(true); }}
-            className="text-sm font-bold text-white bg-primary px-5 py-2.5 rounded-xl hover:bg-primary-dark transition-all shadow-md shadow-primary/10 hover:shadow-lg active:scale-95 cursor-pointer"
-          >
+          <Button onClick={() => { setEditing(null); setForm(blank); setShowForm(true); }}>
             + Add Court
-          </button>
+          </Button>
         )}
       </div>
 
@@ -121,53 +117,51 @@ export function AdminCourts() {
           <h2 className="text-xl font-bold text-on-surface mb-6">{editing ? 'Edit Court Parameters' : 'Register New Court'}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="sm:col-span-2">
-              <Field label="Court Display Name">
-                <input
-                  className={inputCls}
+              <Field label="Court Display Name" htmlFor="court-name">
+                <Input
+                  id="court-name"
                   placeholder="e.g. Court 3 (Clay)"
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 />
               </Field>
             </div>
-            <Field label="Opening Time">
-              <input type="time" className={inputCls} value={form.open}
+            <Field label="Opening Time" htmlFor="court-open">
+              <Input id="court-open" type="time" value={form.open}
                 onChange={e => setForm(f => ({ ...f, open: e.target.value }))} />
             </Field>
-            <Field label="Closing Time">
-              <input type="time" className={inputCls} value={form.close}
+            <Field label="Closing Time" htmlFor="court-close">
+              <Input id="court-close" type="time" value={form.close}
                 onChange={e => setForm(f => ({ ...f, close: e.target.value }))} />
             </Field>
-            <Field label="Slot length (base unit)">
-              <div className={`${inputCls} text-on-surface-muted bg-gray-50 border-gray-100 cursor-not-allowed select-none font-medium`}>
+            <Field label="Slot length (base unit)" htmlFor="court-slot-length">
+              <div
+                id="court-slot-length"
+                className="w-full border border-gray-100 rounded-xl px-4 py-2.5 text-sm text-on-surface-muted bg-gray-50 cursor-not-allowed select-none font-medium"
+              >
                 {form.slotLengthMinutes} minutes — fixed calendar block
               </div>
             </Field>
-            <Field label="Day / Night boundary">
-              <input type="time" className={inputCls} value={form.dayNightBoundary}
+            <Field label="Day / Night boundary" htmlFor="court-boundary" hint="Sets the split time for Night rates">
+              <Input id="court-boundary" type="time" value={form.dayNightBoundary}
                 onChange={e => setForm(f => ({ ...f, dayNightBoundary: e.target.value }))} />
-              <p className="text-[11px] font-medium text-on-surface-muted mt-2 px-1">Sets the split time for Night rates</p>
             </Field>
           </div>
 
           {isTimeInvalid && (
-            <p className="text-xs font-semibold text-red-600 mt-4 px-1">
-              ⚠️ Closing time must be strictly after opening time.
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-red-600 mt-4 px-1">
+              <WarningIcon />
+              Closing time must be strictly after opening time.
             </p>
           )}
 
           <div className="flex gap-3 mt-8">
-            <button
-              onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending || isFormInvalid}
-              className="bg-primary text-white text-sm font-bold px-6 py-3 rounded-xl disabled:opacity-50 hover:bg-primary-dark transition-all cursor-pointer shadow-md shadow-primary/10 hover:shadow-lg"
-            >
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || isFormInvalid}>
               {saveMutation.isPending ? 'Saving…' : 'Save Court'}
-            </button>
-            <button onClick={cancelForm}
-              className="text-sm font-semibold text-on-surface-muted px-6 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition-all cursor-pointer">
+            </Button>
+            <Button variant="outline" onClick={cancelForm}>
               Cancel
-            </button>
+            </Button>
           </div>
           {saveMutation.isError && (
             <p className="text-xs font-semibold text-red-600 mt-4 px-1">
@@ -275,12 +269,9 @@ function CourtCard({
             </span>
           )}
         </div>
-        <button
-          onClick={onEdit}
-          className="text-xs font-bold text-primary border border-primary/20 rounded-xl px-4 py-2 hover:bg-primary-light transition-all cursor-pointer"
-        >
+        <Button variant="outline-primary" size="sm" onClick={onEdit}>
           Edit
-        </button>
+        </Button>
       </div>
 
       <div className="space-y-2.5 text-sm mb-6 border-t border-gray-50 pt-4">
@@ -298,30 +289,23 @@ function CourtCard({
 
       <div className="flex gap-2">
         {court.active ? (
-          <button
-            onClick={onToggle}
-            disabled={toggling || deleting}
-            className="flex-1 text-xs font-bold text-red-600 bg-red-50/50 border border-red-100/80 rounded-xl py-2.5 hover:bg-red-50 hover:text-red-700 transition-all disabled:opacity-50 cursor-pointer"
-          >
+          <Button variant="danger" size="sm" className="flex-1" onClick={onToggle} disabled={toggling || deleting}>
             {toggling ? 'Deactivating…' : 'Deactivate Court'}
-          </button>
+          </Button>
         ) : (
-          <button
-            onClick={onToggle}
-            disabled={toggling || deleting}
-            className="flex-1 text-xs font-bold text-primary bg-primary-light border border-primary/10 rounded-xl py-2.5 hover:bg-primary/10 transition-all disabled:opacity-50 cursor-pointer"
-          >
+          <Button variant="subtle-primary" size="sm" className="flex-1" onClick={onToggle} disabled={toggling || deleting}>
             {toggling ? 'Reactivating…' : 'Reactivate Court'}
-          </button>
+          </Button>
         )}
-        <button
+        <Button
+          variant="danger-solid"
+          size="sm"
           onClick={onDelete}
           disabled={toggling || deleting}
           title="Delete permanently (only possible if the court has no bookings)"
-          className="text-xs font-bold text-white bg-red-600 rounded-xl px-4 py-2.5 hover:bg-red-700 transition-all disabled:opacity-50 cursor-pointer"
         >
           {deleting ? 'Deleting…' : 'Delete'}
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -3,14 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCourts, adminGetBlackouts, adminCreateBlackout, adminDeleteBlackout, adminGetBlackoutConflicts, apiErrorMessage } from '../../lib/api';
 import type { Court, Blackout } from '../../types';
 import { formatDateTime } from '../../lib/utils';
+import { asWallClock, courtNow } from '../../lib/courtTime';
+import { Button } from '../../components/ui/Button';
+import { Input, Select, Field } from '../../components/ui/Input';
 
 interface BlackoutConflict {
   id: string;
   slotStarts: string[];
   user: { email: string; name: string | null };
 }
-
-const inputCls = 'w-full border border-outline-variant rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary bg-white';
 
 export function AdminBlackouts() {
   const qc = useQueryClient();
@@ -63,8 +64,9 @@ export function AdminBlackouts() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['blackouts'] }),
   });
 
+  const now = courtNow();
   function isUpcoming(start: string) {
-    return new Date(start) > new Date();
+    return asWallClock(start) > now;
   }
 
   return (
@@ -75,12 +77,9 @@ export function AdminBlackouts() {
           <p className="text-sm text-on-surface-muted mt-0.5">Block court time for maintenance or events</p>
         </div>
         {!showForm && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="text-sm font-semibold text-white bg-primary px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors"
-          >
+          <Button onClick={() => setShowForm(true)}>
             + Add Blackout
-          </button>
+          </Button>
         )}
       </div>
 
@@ -90,47 +89,46 @@ export function AdminBlackouts() {
           <h2 className="font-semibold text-on-surface mb-4">New Blackout</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
-              <label className="block text-xs font-medium text-on-surface-muted mb-1">Court</label>
-              <select className={inputCls} value={form.courtId}
-                onChange={e => setForm(f => ({ ...f, courtId: e.target.value }))}>
-                <option value="">Select court…</option>
-                {courts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <Field label="Court" htmlFor="bl-court">
+                <Select id="bl-court" value={form.courtId}
+                  onChange={e => setForm(f => ({ ...f, courtId: e.target.value }))}>
+                  <option value="">Select court…</option>
+                  {courts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+              </Field>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-on-surface-muted mb-1">Start</label>
-              <input type="datetime-local" className={inputCls} value={form.start}
+            <Field label="Start" htmlFor="bl-start">
+              <Input id="bl-start" type="datetime-local" value={form.start}
                 onChange={e => setForm(f => ({ ...f, start: e.target.value }))} />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-on-surface-muted mb-1">End</label>
-              <input type="datetime-local" className={inputCls} value={form.end}
+            </Field>
+            <Field label="End" htmlFor="bl-end">
+              <Input id="bl-end" type="datetime-local" value={form.end}
                 onChange={e => setForm(f => ({ ...f, end: e.target.value }))} />
-            </div>
+            </Field>
             <div className="sm:col-span-2">
-              <label className="block text-xs font-medium text-on-surface-muted mb-1">Reason (optional)</label>
-              <input
-                className={inputCls}
-                placeholder="e.g. Net maintenance, Club event"
-                value={form.reason}
-                onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
-              />
+              <Field label="Reason (optional)" htmlFor="bl-reason">
+                <Input
+                  id="bl-reason"
+                  placeholder="e.g. Net maintenance, Club event"
+                  value={form.reason}
+                  onChange={e => setForm(f => ({ ...f, reason: e.target.value }))}
+                />
+              </Field>
             </div>
           </div>
           <div className="flex gap-3 mt-4">
-            <button
+            <Button
               onClick={() => conflictCheckMutation.mutate()}
               disabled={conflictCheckMutation.isPending || createMutation.isPending || !form.courtId || !form.start || !form.end || form.end <= form.start}
-              className="bg-primary text-white text-sm font-semibold px-5 py-2 rounded-lg disabled:opacity-50 hover:bg-primary-dark transition-colors"
             >
               {conflictCheckMutation.isPending ? 'Checking…' : createMutation.isPending ? 'Saving…' : 'Save Blackout'}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => { setShowForm(false); setForm({ courtId: '', start: '', end: '', reason: '' }); }}
-              className="text-sm text-on-surface-muted px-5 py-2 rounded-lg border border-outline-variant hover:bg-gray-50 transition-colors"
             >
               Cancel
-            </button>
+            </Button>
           </div>
           {(createMutation.isError || conflictCheckMutation.isError) && (
             <p className="text-xs font-semibold text-red-600 mt-3">
@@ -141,15 +139,15 @@ export function AdminBlackouts() {
       )}
 
       {/* Filter */}
-      <div className="mb-4">
-        <select
-          className="border border-outline-variant rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary bg-white"
+      <div className="mb-4 max-w-xs">
+        <Select
+          aria-label="Filter by court"
           value={filterCourtId}
           onChange={e => setFilterCourtId(e.target.value)}
         >
           <option value="">All Courts</option>
           {courts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        </Select>
       </div>
 
       {/* Blackout list */}
@@ -186,15 +184,16 @@ export function AdminBlackouts() {
                 </div>
                 {upcoming && (
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    <button
+                    <Button
+                      variant="danger"
+                      size="sm"
                       onClick={() => {
                         if (window.confirm('Remove this blackout?')) deleteMutation.mutate(bl.id);
                       }}
                       disabled={deleteMutation.isPending && deleteMutation.variables === bl.id}
-                      className="text-xs font-medium text-red-600 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 transition-colors disabled:opacity-50"
                     >
                       {deleteMutation.isPending && deleteMutation.variables === bl.id ? 'Removing…' : 'Remove'}
-                    </button>
+                    </Button>
                     {deleteMutation.isError && deleteMutation.variables === bl.id && (
                       <span className="text-[11px] text-red-600 font-medium">{apiErrorMessage(deleteMutation.error, 'Failed to remove.')}</span>
                     )}

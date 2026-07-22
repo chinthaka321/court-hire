@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCourts, adminGetPricing, adminUpsertPricing } from '../../lib/api';
 import type { Court, PriceRate, DayType, PriceBand } from '../../types';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 
 type Grid = Record<`${DayType}_${PriceBand}`, string>;
 
 const emptyGrid: Grid = { Weekday_Day: '', Weekday_Night: '', Weekend_Day: '', Weekend_Night: '' };
-
-const inputCls = 'w-full border border-outline-variant rounded-lg px-3 py-2.5 text-base font-semibold text-on-surface focus:outline-none focus:border-primary text-center bg-white';
 
 function gridFromRates(rates: PriceRate[]): Grid {
   const g: Grid = { ...emptyGrid };
@@ -30,13 +30,14 @@ function PriceCell({
       </p>
       <div className="flex items-center gap-1">
         <span className="text-sm text-on-surface-muted font-medium">$</span>
-        <input
+        <Input
           type="number"
           min="0"
           step="0.50"
-          className={inputCls}
+          className="text-base font-semibold text-center"
           value={value}
           placeholder="0.00"
+          aria-label={`${dayType} ${band} price`}
           onChange={e => onChange(e.target.value)}
         />
       </div>
@@ -103,13 +104,9 @@ function RateGridEditor({ courtId, initialRates }: { courtId: string; initialRat
         <p className="text-xs font-semibold text-red-600 mb-3">All four prices must be filled in and zero or greater.</p>
       )}
 
-      <button
-        onClick={() => saveMutation.mutate()}
-        disabled={saveMutation.isPending || isGridInvalid}
-        className="bg-primary text-white font-semibold py-3 px-6 rounded-xl text-sm disabled:opacity-50 hover:bg-primary-dark transition-colors"
-      >
+      <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || isGridInvalid}>
         {saveMutation.isPending ? 'Saving…' : 'Save Pricing'}
-      </button>
+      </Button>
 
       {saveMutation.isSuccess && (
         <span className="ml-3 text-sm text-green-700">Saved ✓</span>
@@ -151,10 +148,10 @@ export function AdminPricing() {
             <button
               key={c.id}
               onClick={() => setPickedCourtId(c.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer active:scale-95 ${
                 selectedCourtId === c.id
-                  ? 'bg-primary text-white'
-                  : 'bg-white border border-outline-variant text-on-surface-muted hover:border-primary hover:text-on-surface'
+                  ? 'bg-primary text-white shadow-md shadow-primary/10'
+                  : 'bg-white border border-gray-200 text-on-surface-muted hover:border-primary hover:text-on-surface'
               }`}
             >
               {c.name}
