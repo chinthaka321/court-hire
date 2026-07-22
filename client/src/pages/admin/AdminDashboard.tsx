@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { adminGetBookings, adminGetCourts } from '../../lib/api';
-import { formatPrice, formatDateTime } from '../../lib/utils';
+import { formatPrice, formatDateTime, toDateOnlyString } from '../../lib/utils';
+import { courtNow } from '../../lib/courtTime';
 import type { AdminBooking, Court } from '../../types';
 
 interface StatCardProps {
@@ -11,15 +12,20 @@ interface StatCardProps {
   sub?: string;
   accent?: string;
   icon: ReactNode;
+  loading?: boolean;
 }
 
-function StatCard({ label, value, sub, accent, icon }: StatCardProps) {
+function StatCard({ label, value, sub, accent, icon, loading }: StatCardProps) {
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm shadow-gray-200/40 hover:shadow-md transition-all duration-300 group">
       <div className="flex items-start justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold text-on-surface-muted uppercase tracking-wider">{label}</p>
-          <p className={`text-3xl font-extrabold mt-2 tracking-tight ${accent ?? 'text-on-surface'}`}>{value}</p>
+          {loading ? (
+            <div className="h-8 w-20 bg-gray-100 rounded-lg mt-2 animate-pulse" />
+          ) : (
+            <p className={`text-3xl font-extrabold mt-2 tracking-tight ${accent ?? 'text-on-surface'}`}>{value}</p>
+          )}
           {sub && <p className="text-xs font-medium text-on-surface-muted mt-1.5">{sub}</p>}
         </div>
         <div className="p-3.5 bg-gray-50 rounded-2xl text-on-surface-muted group-hover:bg-primary-light group-hover:text-primary transition-all duration-300">
@@ -44,24 +50,27 @@ function BookingStateBadge({ state }: { state: string }) {
 }
 
 export function AdminDashboard() {
-  const today = new Date().toISOString().split('T')[0];
+  const now = courtNow();
+  const today = toDateOnlyString(now);
 
-  const { data: courts = [] } = useQuery<Court[]>({
+  const { data: courts = [], isLoading: courtsLoading } = useQuery<Court[]>({
     queryKey: ['admin-courts'],
     queryFn: adminGetCourts,
   });
 
-  const { data: todayData } = useQuery({
+  const { data: todayData, isLoading: todayLoading } = useQuery({
     queryKey: ['admin-bookings', 'today', today],
     // Completed only: a cancelled/refunded booking is neither a booking to
     // fulfil today nor revenue received (#27)
     queryFn: () => adminGetBookings({ date: today, page: 1, pageSize: 50, state: 'Completed' }),
   });
 
-  const { data: recentData } = useQuery({
+  const { data: recentData, isLoading: recentLoading } = useQuery({
     queryKey: ['admin-bookings', 'recent'],
     queryFn: () => adminGetBookings({ page: 1, pageSize: 8 }),
   });
+
+  const statsLoading = courtsLoading || todayLoading;
 
   const todayBookings: AdminBooking[] = todayData?.items ?? [];
   const todayCount: number = todayData?.total ?? 0;
@@ -120,7 +129,7 @@ export function AdminDashboard() {
         <h1 className="text-3xl font-extrabold text-on-surface tracking-tight">Dashboard</h1>
         <p className="text-sm font-semibold text-primary mt-1.5 flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 bg-primary rounded-full animate-ping" />
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          {now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
       </div>
 
@@ -130,6 +139,7 @@ export function AdminDashboard() {
           label="Today's Bookings"
           value={todayCount}
           sub="confirmed court slots"
+          loading={statsLoading}
           icon={
             <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
               <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
@@ -142,6 +152,7 @@ export function AdminDashboard() {
           value={formatPrice(todayRevenue)}
           sub="received today"
           accent="text-primary"
+          loading={statsLoading}
           icon={
             <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
               <path d="M8.433 7.418c.554-.589 1.448-.589 2.002 0l.207.22 1.477-1.477-.207-.22A4.085 4.085 0 009 4.75V3a1 1 0 10-2 0v1.75a4.1 4.1 0 00-2.514 1.258l-.007.008a1 1 0 01-1.414-1.414l.007-.007A6.1 6.1 0 017 2.85V1a1 1 0 10-2 0v1.85A6.086 6.086 0 001.078 6.847c-.57.575-.56 1.5.02 2.072l.007.007A6.086 6.086 0 005.078 10.85V13a1 1 0 102 0v-2.15a6.086 6.086 0 003.922-2.153l.007-.008a1 1 0 011.414 1.414l-.007.007A6.1 6.1 0 019 12.15V14a1 1 0 102 0v-1.85c.613-.105 1.196-.328 1.72-.65l1.493 1.493a1 1 0 001.414-1.414L14.134 10.1A4.088 4.088 0 0011 8.25V6.582a4.103 4.103 0 00-2.567.836l-.207-.22a4.085 4.085 0 000-2.002l.207.22z" />
@@ -152,6 +163,7 @@ export function AdminDashboard() {
           label="Total Bookings"
           value={totalBookings}
           sub="aggregate book count"
+          loading={recentLoading}
           icon={
             <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
               <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
@@ -162,6 +174,7 @@ export function AdminDashboard() {
           label="Active Courts"
           value={activeCourts}
           sub={`online of ${courts.length} total`}
+          loading={courtsLoading}
           icon={
             <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clipRule="evenodd" />
@@ -184,7 +197,22 @@ export function AdminDashboard() {
             </Link>
           </div>
 
-          {recentBookings.length === 0 ? (
+          {recentLoading ? (
+            <div className="divide-y divide-gray-50 animate-pulse">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between px-6 py-4">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="h-4 bg-gray-100 rounded w-32" />
+                    <div className="h-3 bg-gray-100 rounded w-48" />
+                  </div>
+                  <div className="flex items-center gap-4 ml-4 shrink-0">
+                    <div className="h-4 bg-gray-100 rounded w-12" />
+                    <div className="h-6 bg-gray-100 rounded-full w-20" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : recentBookings.length === 0 ? (
             <div className="text-center py-16">
               <p className="text-sm font-semibold text-on-surface-muted">No Bookings Yet</p>
             </div>

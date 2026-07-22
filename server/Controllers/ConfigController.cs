@@ -19,7 +19,8 @@ public class ConfigController(IConfiguration config) : ControllerBase
         {
             s.CancellationWindowHours,
             s.BookingHorizonDays,
-            s.HoldTtlMinutes
+            s.HoldTtlMinutes,
+            TimeZoneId = config["App:TimeZoneId"] ?? "UTC"
         });
     }
 }

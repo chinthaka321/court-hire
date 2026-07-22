@@ -5,11 +5,12 @@ using TennisBooking.Services;
 
 namespace TennisBooking.Jobs;
 
-public class SweepExpiredHoldsJob(AppDbContext db, ILogger<SweepExpiredHoldsJob> logger)
+public class SweepExpiredHoldsJob(AppDbContext db, CourtClock clock, ILogger<SweepExpiredHoldsJob> logger)
 {
     public async Task ExecuteAsync()
     {
-        var expired = await db.Holds.Where(h => h.ExpiresAt <= DateTime.UtcNow).ToListAsync();
+        var now = clock.Now();
+        var expired = await db.Holds.Where(h => h.ExpiresAt <= now).ToListAsync();
         if (expired.Count > 0)
         {
             db.Holds.RemoveRange(expired);
@@ -19,7 +20,7 @@ public class SweepExpiredHoldsJob(AppDbContext db, ILogger<SweepExpiredHoldsJob>
     }
 }
 
-public class SendReminderEmailsJob(AppDbContext db, EmailService email, IConfiguration config, ILogger<SendReminderEmailsJob> logger)
+public class SendReminderEmailsJob(AppDbContext db, EmailService email, IConfiguration config, CourtClock clock, ILogger<SendReminderEmailsJob> logger)
 {
     public async Task ExecuteAsync()
     {
@@ -27,7 +28,7 @@ public class SendReminderEmailsJob(AppDbContext db, EmailService email, IConfigu
 
         // Any not-yet-reminded booking starting within the reminder horizon.
         // ReminderSent prevents duplicates, so a delayed job run can't skip bookings.
-        var now = DateTime.UtcNow;
+        var now = clock.Now();
         var cutoff = now.AddHours(hoursBefore);
 
         var upcoming = await db.Bookings

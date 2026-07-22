@@ -1,4 +1,5 @@
-import { addDays, format, isSameDay, isToday } from 'date-fns';
+import { addDays, format, isSameDay } from 'date-fns';
+import { courtNow } from '../lib/courtTime';
 
 interface Props {
   selected: Date;
@@ -7,14 +8,14 @@ interface Props {
 }
 
 export function DatePicker({ selected, onSelect, horizonDays = 14 }: Props) {
-  const today = new Date();
+  const today = courtNow();
 
   return (
     <div className="flex gap-2.5 overflow-x-auto pb-1 pt-1 scrollbar-none snap-x snap-mandatory">
       {Array.from({ length: horizonDays + 1 }, (_, i) => {
         const day = addDays(today, i);
         const isSelected = isSameDay(day, selected);
-        const isTodayDay = isToday(day);
+        const isTodayDay = isSameDay(day, today);
 
         return (
           <button

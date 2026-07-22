@@ -8,7 +8,7 @@ public enum SlotStatus { Available, Held, Booked, Past, BlackedOut, BeyondHorizo
 
 public record SlotInfo(DateTime SlotStart, DateTime SlotEnd, SlotStatus Status, decimal Price, bool HeldByMe = false);
 
-public class AvailabilityService(AppDbContext db, PricingService pricing, IConfiguration config)
+public class AvailabilityService(AppDbContext db, PricingService pricing, IConfiguration config, CourtClock clock)
 {
     private BookingSettings Settings => config.GetSection("Booking").Get<BookingSettings>() ?? new();
 
@@ -20,7 +20,7 @@ public class AvailabilityService(AppDbContext db, PricingService pricing, IConfi
             ?? throw new KeyNotFoundException("Court not found");
 
         var slots = GenerateGrid(court, date);
-        var now = DateTime.UtcNow;
+        var now = clock.Now();
         var horizonEnd = now.AddDays(Settings.BookingHorizonDays);
 
         var dayStart = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);

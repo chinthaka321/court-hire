@@ -45,6 +45,7 @@ builder.Services.AddHangfire(cfg => cfg
 builder.Services.AddHangfireServer();
 
 // App services
+builder.Services.AddSingleton<CourtClock>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<PricingService>();
 builder.Services.AddScoped<AvailabilityService>();

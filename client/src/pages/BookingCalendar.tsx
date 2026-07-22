@@ -7,7 +7,8 @@ import { DatePicker } from '../components/DatePicker';
 import { SlotCell } from '../components/SlotCell';
 import type { Booking, Court, SlotInfo, SlotStatus } from '../types';
 import { toDateOnlyString, formatPrice, formatDateTime } from '../lib/utils';
-import { isToday, format } from 'date-fns';
+import { courtNow } from '../lib/courtTime';
+import { format, isSameDay } from 'date-fns';
 
 const DURATIONS = [60, 90, 120] as const;
 type Duration = (typeof DURATIONS)[number];
@@ -51,7 +52,7 @@ function groupSlots(slots: SlotInfo[], durationMinutes: number): DisplaySlot[] {
 }
 
 export function BookingCalendar() {
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(() => courtNow());
   const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
   const [duration, setDuration] = useState<Duration>(60);
   const [rescheduleError, setRescheduleError] = useState<string | null>(null);
@@ -107,13 +108,10 @@ export function BookingCalendar() {
   });
 
   const slots = groupSlots(rawSlots, activeDuration);
-  const now = new Date();
-  const visibleSlots = slots.filter(s => {
-    // Keep past time slots hidden
-    if (new Date(s.slotStart) < now) return false;
-    return true;
-  });
-
+  const now = courtNow();
+  // The server already classifies past slots as status 'Past' (using the same
+  // court-local clock), so filtering on 'Available' alone hides them too.
+  const visibleSlots = slots.filter(s => s.status === 'Available');
   function handleSlotTap(slot: DisplaySlot) {
     if (!isSignedIn) {
       openSignIn();
@@ -129,7 +127,7 @@ export function BookingCalendar() {
     );
   }
 
-  const dateLabel = isToday(selectedDate)
+  const dateLabel = isSameDay(selectedDate, now)
     ? 'Today'
     : format(selectedDate, 'EEE, MMM d');
 

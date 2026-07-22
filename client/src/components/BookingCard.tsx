@@ -1,5 +1,6 @@
 import type { Booking } from '../types';
 import { formatDateTime, formatPrice } from '../lib/utils';
+import { asWallClock, courtNow } from '../lib/courtTime';
 
 interface Props {
   booking: Booking;
@@ -15,7 +16,7 @@ const stateConfig: Record<string, { label: string; cls: string }> = {
 
 export function BookingCard({ booking, onCancel, onReschedule }: Props) {
   const slotStart = booking.slotStarts[0];
-  const isUpcoming = new Date(slotStart) > new Date();
+  const isUpcoming = asWallClock(slotStart) > courtNow();
   const canAct = booking.state === 'Completed' && isUpcoming;
   const { label, cls } = stateConfig[booking.state] ?? { label: booking.state, cls: 'bg-gray-100 text-gray-500' };
 

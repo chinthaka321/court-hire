@@ -3,12 +3,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TennisBooking.Data;
 using TennisBooking.Models;
+using TennisBooking.Services;
 
 namespace TennisBooking.Controllers;
 
 [ApiController]
 [Route("api/courts")]
-public class CourtsController(AppDbContext db) : ControllerBase
+public class CourtsController(AppDbContext db, CourtClock clock) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> List()
@@ -113,7 +114,8 @@ public class CourtsController(AppDbContext db) : ControllerBase
             return Conflict(new { error = "This court has existing bookings and cannot be deleted. Deactivate it instead." });
         }
 
-        var hasActiveHolds = await db.Holds.AnyAsync(h => h.CourtId == id && h.ExpiresAt > DateTime.UtcNow);
+        var now = clock.Now();
+        var hasActiveHolds = await db.Holds.AnyAsync(h => h.CourtId == id && h.ExpiresAt > now);
         if (hasActiveHolds)
         {
             return Conflict(new { error = "This court has an in-progress checkout. Try again shortly." });

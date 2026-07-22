@@ -1,7 +1,8 @@
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import { useEffect } from 'react';
-import { setAuthToken, getMe } from './lib/api';
+import { setAuthToken, getMe, getConfig } from './lib/api';
+import { setCourtTimeZone } from './lib/courtTime';
 import { Navbar } from './components/Navbar';
 import { AdminRoute } from './components/AdminRoute';
 import { AdminLayout } from './components/AdminLayout';
@@ -38,12 +39,23 @@ function TokenSyncer() {
   return null;
 }
 
+// Fetches the court's real timezone once so courtNow()/asWallClock() in
+// courtTime.ts compare against the court's local wall-clock time, not the
+// viewer's own browser timezone (see server/appsettings.json App:TimeZoneId).
+function ConfigSyncer() {
+  useEffect(() => {
+    getConfig().then(cfg => setCourtTimeZone(cfg.timeZoneId)).catch(() => {});
+  }, []);
+  return null;
+}
+
 function AppShell() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith('/admin');
   return (
     <>
       <TokenSyncer />
+      <ConfigSyncer />
       {!isAdmin && <Navbar />}
       <Routes>
         <Route path="/" element={<BookingCalendar />} />

@@ -29,7 +29,12 @@ export function apiErrorMessage(e: unknown, fallback: string): string {
 
 // Booking policy values (cancellation window etc.) for honest client dialogs
 export const getConfig = () =>
-  api.get('/config').then(r => r.data as { cancellationWindowHours: number; bookingHorizonDays: number; holdTtlMinutes: number });
+  api.get('/config').then(r => r.data as {
+    cancellationWindowHours: number;
+    bookingHorizonDays: number;
+    holdTtlMinutes: number;
+    timeZoneId: string;
+  });
 
 // Courts
 export const getCourts = () => api.get('/courts').then(r => r.data);
@@ -57,6 +62,9 @@ export const pollBookingByHoldGroup = (holdGroupId: string) =>
 // Admin
 export const adminGetBookings = (params?: object) =>
   api.get('/admin/bookings', { params }).then(r => r.data);
+export const adminCreateBooking = (data: {
+  courtId: string; slotStart: string; slotCount: number; notes?: string;
+}) => api.post('/admin/bookings', data).then(r => r.data);
 export const adminCancelBooking = (id: string) => api.delete(`/admin/bookings/${id}`);
 export const adminGetPricing = (courtId: string) =>
   api.get(`/admin/courts/${courtId}/pricing`).then(r => r.data);
