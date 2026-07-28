@@ -9,7 +9,13 @@ namespace TennisBooking.Controllers;
 [ApiController]
 [Route("api/bookings")]
 [Authorize]
-public class BookingsController(AppDbContext db, BookingService bookingService, StripeRefundService refundService, EmailService emailService, ILogger<BookingsController> logger) : ControllerBase
+public class BookingsController(
+    AppDbContext db,
+    BookingService bookingService,
+    IPaymentGateway paymentGateway,
+    EmailService emailService,
+    ILogger<BookingsController> logger
+) : ControllerBase
 {
     private string UserId => User.FindFirst("sub")!.Value;
 
@@ -60,13 +66,11 @@ public class BookingsController(AppDbContext db, BookingService bookingService, 
             {
                 try
                 {
-                    booking.StripeRefundId = await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
+                    booking.StripeRefundId = await paymentGateway.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
                     await db.SaveChangesAsync();
                 }
                 catch (Exception ex)
                 {
-                    // The cancellation is already committed; don't leave the user
-                    // guessing about whether their money is coming back.
                     logger.LogError(ex, "Refund failed for cancelled booking {BookingId} (paymentIntent {PaymentIntent})", id, booking.StripePaymentIntentId);
                     await emailService.SendBookingCancelledAsync(booking);
                     return StatusCode(502, new { error = "Your booking was cancelled, but the refund could not be processed automatically. Our staff have been notified and will issue it manually." });

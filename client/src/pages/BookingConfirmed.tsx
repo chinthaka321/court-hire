@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getMyBookings } from '../lib/api';
 import type { Booking } from '../types';
 import { formatDateTime, formatPrice } from '../lib/utils';
+import { Button } from '../components/ui/Button';
 
 export function BookingConfirmed() {
   const { id } = useParams<{ id: string }>();
@@ -55,18 +56,12 @@ export function BookingConfirmed() {
       )}
 
       <div className="flex flex-col gap-3 mt-8">
-        <button
-          onClick={() => navigate('/my-bookings')}
-          className="w-full bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary-dark transition-colors"
-        >
+        <Button className="w-full py-3" onClick={() => navigate('/my-bookings')}>
           View My Bookings
-        </button>
-        <button
-          onClick={() => navigate('/')}
-          className="w-full text-primary font-medium py-3 rounded-xl border border-primary hover:bg-primary-light transition-colors"
-        >
+        </Button>
+        <Button variant="outline-primary" className="w-full py-3" onClick={() => navigate('/')}>
           Book Another Court
-        </button>
+        </Button>
       </div>
     </div>
   );

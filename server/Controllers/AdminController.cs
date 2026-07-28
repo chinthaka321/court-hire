@@ -10,9 +10,14 @@ namespace TennisBooking.Controllers;
 [ApiController]
 [Route("api/admin")]
 [Authorize(Policy = "AdminOnly")]
-public class AdminController(AppDbContext db, BookingService bookingService, StripeRefundService refundService, EmailService emailService, ILogger<AdminController> logger) : ControllerBase
+public class AdminController(
+    AppDbContext db,
+    BookingService bookingService,
+    IPaymentGateway paymentGateway,
+    EmailService emailService,
+    ILogger<AdminController> logger
+) : ControllerBase
 {
-    // Courts (admin view — includes inactive)
     [HttpGet("courts")]
     public async Task<IActionResult> GetAllCourts()
     {
@@ -33,7 +38,6 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
         return NoContent();
     }
 
-    // Pricing
     [HttpGet("courts/{courtId:guid}/pricing")]
     public async Task<IActionResult> GetPricing(Guid courtId)
     {
@@ -63,7 +67,6 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
         return NoContent();
     }
 
-    // Blackouts
     [HttpGet("blackouts")]
     public async Task<IActionResult> GetBlackouts([FromQuery] Guid? courtId)
     {
@@ -75,7 +78,6 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
         return Ok(result);
     }
 
-    // Bookings that would be silently hidden by a blackout over this window — see ADR-0012.
     [HttpGet("blackouts/conflicts")]
     public async Task<IActionResult> GetBlackoutConflicts([FromQuery] Guid courtId, [FromQuery] DateTime start, [FromQuery] DateTime end)
     {
@@ -86,8 +88,6 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
         var rangeEnd = end.ToUniversalTime();
         var slotLength = court.SlotLengthMinutes;
 
-        // Filter the overlap in SQL (same pattern as GetAllBookings below) instead of
-        // pulling the court's entire non-cancelled booking history into memory first.
         var conflicts = await db.Bookings
             .Where(b => b.CourtId == courtId && b.State != BookingState.Cancelled
                         && b.SlotStarts.Any(s => s < rangeEnd && s.AddMinutes(slotLength) > rangeStart))
@@ -129,7 +129,6 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
         return NoContent();
     }
 
-    // Bookings
     [HttpGet("bookings")]
     public async Task<IActionResult> GetAllBookings(
         [FromQuery] Guid? courtId,
@@ -148,7 +147,9 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
         if (search is not null)
             query = query.Where(b =>
                 b.User.Email.Contains(search) ||
-                (b.User.Name != null && b.User.Name.Contains(search)));
+                (b.User.Name != null && b.User.Name.Contains(search)) ||
+                (b.PayerName != null && b.PayerName.Contains(search)) ||
+                (b.PayerEmail != null && b.PayerEmail.Contains(search)));
         if (date.HasValue)
         {
             var start = date.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
@@ -163,6 +164,7 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
             .Take(pageSize)
             .Select(b => new {
                 b.Id, b.State, b.AmountCharged, b.SlotStarts, b.CreatedAt, b.Notes,
+                b.PayerName, b.PayerEmail,
                 Court = new { b.Court.Id, b.Court.Name },
                 User  = new { b.User.Id, b.User.Email, b.User.Name }
             })
@@ -177,13 +179,19 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
         var adminUserId = User.FindFirst("sub")?.Value
             ?? throw new UnauthorizedAccessException();
 
+        if (string.IsNullOrWhiteSpace(req.PayerName) && string.IsNullOrWhiteSpace(req.PayerEmail))
+        {
+            return BadRequest(new { error = "Enter the customer's name or email so the booking can be attributed correctly." });
+        }
+
         try
         {
             var booking = await bookingService.CreateAdminBookingAsync(
-                req.CourtId, req.SlotStart.ToUniversalTime(), req.SlotCount, adminUserId, req.Notes);
+                req.CourtId, req.SlotStart.ToUniversalTime(), req.SlotCount, adminUserId, req.Notes,
+                req.PayerName?.Trim(), req.PayerEmail?.Trim());
             return Ok(new {
                 booking.Id, booking.State, booking.AmountCharged, booking.SlotStarts,
-                booking.Notes, booking.CreatedAt, CourtId = req.CourtId
+                booking.Notes, booking.PayerName, booking.PayerEmail, booking.CreatedAt, CourtId = req.CourtId
             });
         }
         catch (KeyNotFoundException ex) { return NotFound(new { error = ex.Message }); }
@@ -212,7 +220,7 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
         {
             try
             {
-                booking.StripeRefundId = await refundService.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
+                booking.StripeRefundId = await paymentGateway.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
                 await db.SaveChangesAsync();
             }
             catch (Exception ex)
@@ -232,4 +240,4 @@ public class AdminController(AppDbContext db, BookingService bookingService, Str
 public record UpsertRateRequest(DayType DayType, PriceBand Band, decimal Price);
 public record CreateBlackoutRequest(Guid CourtId, DateTime Start, DateTime End, string? Reason);
 public record SetActiveRequest(bool Active);
-public record CreateAdminBookingRequest(Guid CourtId, DateTime SlotStart, int SlotCount, string? Notes);
+public record CreateAdminBookingRequest(Guid CourtId, DateTime SlotStart, int SlotCount, string? Notes, string? PayerName, string? PayerEmail);

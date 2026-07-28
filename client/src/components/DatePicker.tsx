@@ -21,7 +21,10 @@ export function DatePicker({ selected, onSelect, horizonDays = 14 }: Props) {
           <button
             key={i}
             onClick={() => onSelect(day)}
-            className={`flex flex-col items-center justify-center rounded-2xl py-3 px-4.5 min-w-[72px] snap-start transition-all duration-300 cursor-pointer border ${
+            aria-pressed={isSelected}
+            aria-current={isTodayDay ? 'date' : undefined}
+            aria-label={format(day, 'EEEE, MMMM d')}
+            className={`flex flex-col items-center justify-center rounded-2xl py-3 px-4.5 min-w-[72px] snap-start transition-all duration-300 cursor-pointer border focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
               isSelected
                 ? 'bg-primary text-white border-primary shadow-md shadow-primary/20 scale-102 font-bold'
                 : 'bg-white text-on-surface border-gray-100 hover:border-primary/30 hover:bg-emerald-50/10'

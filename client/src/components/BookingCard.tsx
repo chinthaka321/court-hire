@@ -1,6 +1,7 @@
 import type { Booking } from '../types';
 import { formatDateTime, formatPrice } from '../lib/utils';
 import { asWallClock, courtNow } from '../lib/courtTime';
+import { Button } from './ui/Button';
 
 interface Props {
   booking: Booking;
@@ -44,18 +45,12 @@ export function BookingCard({ booking, onCancel, onReschedule }: Props) {
 
       {canAct && (
         <div className="flex gap-2 mt-4 pt-4 border-t border-[#f0f0f0]">
-          <button
-            onClick={onReschedule}
-            className="flex-1 text-sm font-semibold text-primary py-2 rounded-lg border border-primary hover:bg-primary-light transition-colors"
-          >
+          <Button variant="outline-primary" size="md" className="flex-1" onClick={onReschedule}>
             Reschedule
-          </button>
-          <button
-            onClick={onCancel}
-            className="flex-1 text-sm font-medium text-on-surface-muted py-2 rounded-lg border border-outline-variant hover:bg-gray-50 transition-colors"
-          >
+          </Button>
+          <Button variant="outline" size="md" className="flex-1" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         </div>
       )}
     </div>

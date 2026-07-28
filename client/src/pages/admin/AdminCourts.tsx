@@ -4,6 +4,8 @@ import { adminGetCourts, adminToggleCourt, createCourt, updateCourt, deleteCourt
 import type { Court } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input, Field } from '../../components/ui/Input';
+import { useToast } from '../../components/ui/ToastContext';
+import { Plus, Edit2, AlertCircle } from 'lucide-react';
 
 interface CourtForm {
   name: string;
@@ -15,16 +17,9 @@ interface CourtForm {
 
 const blank: CourtForm = { name: '', open: '07:00', close: '22:00', slotLengthMinutes: 30, dayNightBoundary: '18:00' };
 
-function WarningIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 shrink-0" aria-hidden="true">
-      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.486 0l6.28 11.19c.75 1.334-.213 2.98-1.744 2.98H3.72c-1.53 0-2.493-1.646-1.744-2.98l6.28-11.19zM11 14a1 1 0 11-2 0 1 1 0 012 0zm-.25-6.5a.75.75 0 00-1.5 0v3a.75.75 0 001.5 0v-3z" clipRule="evenodd" />
-    </svg>
-  );
-}
-
 export function AdminCourts() {
   const qc = useQueryClient();
+  const { showToast } = useToast();
   const [editing, setEditing] = useState<string | null>(null);
   const [form, setForm] = useState<CourtForm>(blank);
   const [showForm, setShowForm] = useState(false);
@@ -43,34 +38,40 @@ export function AdminCourts() {
   }
 
   const saveMutation = useMutation({
-    mutationFn: () => editing ? updateCourt(editing, form) : createCourt(form),
+    mutationFn: () => (editing ? updateCourt(editing, form) : createCourt(form)),
     onSuccess: () => {
       invalidateCourtDependents();
+      showToast(editing ? 'Court updated successfully!' : 'New court registered!', 'success');
       setShowForm(false);
       setEditing(null);
       setForm(blank);
     },
+    onError: (e: unknown) => {
+      showToast(apiErrorMessage(e, 'Failed to save court parameters.'), 'error');
+    },
   });
 
-  // Single shared mutation per action; which row is "in flight" is read back off
-  // `mutation.variables` rather than tracked in separate state (React Query already
-  // resets isPending/isError when a new mutate() call starts).
   const toggleMutation = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) => adminToggleCourt(id, active),
-    onSuccess: invalidateCourtDependents,
+    onSuccess: (_, variables) => {
+      invalidateCourtDependents();
+      showToast(variables.active ? 'Court reactivated!' : 'Court deactivated!', 'info');
+    },
+    onError: (e: unknown) => {
+      showToast(apiErrorMessage(e, 'Failed to toggle court status.'), 'error');
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteCourt(id),
-    onSuccess: invalidateCourtDependents,
+    onSuccess: () => {
+      invalidateCourtDependents();
+      showToast('Court removed permanently.', 'success');
+    },
+    onError: (e: unknown) => {
+      showToast(apiErrorMessage(e, 'Cannot delete court with booking history.'), 'error');
+    },
   });
-
-  const toggleError = toggleMutation.isError
-    ? apiErrorMessage(toggleMutation.error, 'Failed to update court status. Please try again.')
-    : null;
-  const deleteError = deleteMutation.isError
-    ? apiErrorMessage(deleteMutation.error, 'Failed to delete court. Please try again.')
-    : null;
 
   function editCourt(c: Court) {
     setEditing(c.id);
@@ -90,115 +91,132 @@ export function AdminCourts() {
     setForm(blank);
   }
 
-  const activeCourts = courts.filter(c => c.active);
-  const inactiveCourts = courts.filter(c => !c.active);
+  const activeCourts = courts.filter((c) => c.active);
+  const inactiveCourts = courts.filter((c) => !c.active);
 
-  const isTimeInvalid = form.close !== "00:00" && form.close <= form.open;
+  const isTimeInvalid = form.close !== '00:00' && form.close <= form.open;
   const isFormInvalid = !form.name.trim() || isTimeInvalid;
 
   return (
-    <div className="px-4 sm:px-6 py-8 max-w-4xl mx-auto">
+    <div className="px-4 sm:px-8 py-8 max-w-5xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-on-surface tracking-tight">Courts</h1>
-          <p className="text-sm text-on-surface-muted mt-1">Configure operating hours, slot base unit, and pricing bands</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Courts Manager</h1>
+          <p className="text-sm font-semibold text-slate-500 mt-1">
+            Configure court names, operating hours, and day/night pricing boundaries.
+          </p>
         </div>
         {!showForm && (
-          <Button onClick={() => { setEditing(null); setForm(blank); setShowForm(true); }}>
-            + Add Court
+          <Button
+            className="self-start sm:self-auto shrink-0 bg-emerald-600 hover:bg-emerald-700 font-extrabold shadow-md shadow-emerald-600/20"
+            onClick={() => {
+              setEditing(null);
+              setForm(blank);
+              setShowForm(true);
+            }}
+          >
+            <Plus className="w-4 h-4 mr-1.5" /> Add New Court
           </Button>
         )}
       </div>
 
-      {/* Add / Edit form */}
+      {/* Add / Edit Form */}
       {showForm && (
-        <div className="bg-white rounded-3xl border border-gray-100 p-6 sm:p-8 shadow-sm shadow-gray-200/40 mb-8 animate-fadeIn">
-          <h2 className="text-xl font-bold text-on-surface mb-6">{editing ? 'Edit Court Parameters' : 'Register New Court'}</h2>
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-2xl space-y-6">
+          <h2 className="text-xl font-black text-slate-900">
+            {editing ? 'Edit Court Parameters' : 'Register New Court'}
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="sm:col-span-2">
               <Field label="Court Display Name" htmlFor="court-name">
                 <Input
                   id="court-name"
-                  placeholder="e.g. Court 3 (Clay)"
+                  placeholder="e.g. Center Court (Clay)"
                   value={form.name}
-                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 />
               </Field>
             </div>
             <Field label="Opening Time" htmlFor="court-open">
-              <Input id="court-open" type="time" value={form.open}
-                onChange={e => setForm(f => ({ ...f, open: e.target.value }))} />
+              <Input
+                id="court-open"
+                type="time"
+                value={form.open}
+                onChange={(e) => setForm((f) => ({ ...f, open: e.target.value }))}
+              />
             </Field>
             <Field label="Closing Time" htmlFor="court-close">
-              <Input id="court-close" type="time" value={form.close}
-                onChange={e => setForm(f => ({ ...f, close: e.target.value }))} />
+              <Input
+                id="court-close"
+                type="time"
+                value={form.close}
+                onChange={(e) => setForm((f) => ({ ...f, close: e.target.value }))}
+              />
             </Field>
-            <Field label="Slot length (base unit)" htmlFor="court-slot-length">
-              <div
+            <Field label="Base Slot Length" htmlFor="court-slot-length">
+              <input
                 id="court-slot-length"
-                className="w-full border border-gray-100 rounded-xl px-4 py-2.5 text-sm text-on-surface-muted bg-gray-50 cursor-not-allowed select-none font-medium"
-              >
-                {form.slotLengthMinutes} minutes — fixed calendar block
-              </div>
+                type="text"
+                disabled
+                readOnly
+                value={`${form.slotLengthMinutes} minutes (Fixed System Standard)`}
+                className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-xs font-bold text-slate-500 bg-slate-50 cursor-not-allowed select-none"
+              />
             </Field>
-            <Field label="Day / Night boundary" htmlFor="court-boundary" hint="Sets the split time for Night rates">
-              <Input id="court-boundary" type="time" value={form.dayNightBoundary}
-                onChange={e => setForm(f => ({ ...f, dayNightBoundary: e.target.value }))} />
+            <Field label="Day / Night Rate Boundary" htmlFor="court-boundary" hint="Separates Day and Night pricing bands">
+              <Input
+                id="court-boundary"
+                type="time"
+                value={form.dayNightBoundary}
+                onChange={(e) => setForm((f) => ({ ...f, dayNightBoundary: e.target.value }))}
+              />
             </Field>
           </div>
 
           {isTimeInvalid && (
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-red-600 mt-4 px-1">
-              <WarningIcon />
-              Closing time must be strictly after opening time.
+            <p className="flex items-center gap-2 text-xs font-bold text-rose-600 bg-rose-50 p-3 rounded-xl border border-rose-200">
+              <AlertCircle className="w-4 h-4" /> Closing time must be after opening time.
             </p>
           )}
 
-          <div className="flex gap-3 mt-8">
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || isFormInvalid}>
-              {saveMutation.isPending ? 'Saving…' : 'Save Court'}
+          <div className="flex gap-3 pt-4 border-t border-slate-100">
+            <Button
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending || isFormInvalid}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {saveMutation.isPending ? 'Saving...' : 'Save Parameters'}
             </Button>
             <Button variant="outline" onClick={cancelForm}>
               Cancel
             </Button>
           </div>
-          {saveMutation.isError && (
-            <p className="text-xs font-semibold text-red-600 mt-4 px-1">
-              {apiErrorMessage(saveMutation.error, 'Failed to save court. Please verify your permissions and try again.')}
-            </p>
-          )}
         </div>
       )}
 
-      {(toggleError || deleteError) && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl px-5 py-3 mb-6 text-sm font-semibold text-red-700">
-          {toggleError ?? deleteError}
-        </div>
-      )}
-
-      {/* Active courts */}
+      {/* Courts list */}
       {courts.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-3xl border border-gray-100 shadow-sm">
-          <p className="text-base font-bold text-on-surface-muted">No Courts Added Yet</p>
-          <p className="text-sm text-gray-400 mt-1">Get started by creating your first tennis court above.</p>
+        <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-xl">
+          <p className="text-lg font-bold text-slate-800">No Courts Configured</p>
+          <p className="text-sm text-slate-400 mt-1">Click &quot;Add New Court&quot; above to setup your facility.</p>
         </div>
       ) : (
         <div className="space-y-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            {activeCourts.map(c => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {activeCourts.map((c) => (
               <CourtCard
                 key={c.id}
                 court={c}
                 onEdit={() => editCourt(c)}
                 onToggle={() => {
-                  if (window.confirm(`Deactivate "${c.name}"? It will be hidden from customer bookings.`)) {
+                  if (window.confirm(`Deactivate "${c.name}"? It will be hidden from public booking.`)) {
                     toggleMutation.mutate({ id: c.id, active: false });
                   }
                 }}
                 toggling={toggleMutation.isPending && toggleMutation.variables?.id === c.id}
                 onDelete={() => {
-                  if (window.confirm(`Permanently delete "${c.name}"? This cannot be undone.`)) {
+                  if (window.confirm(`Permanently remove "${c.name}"?`)) {
                     deleteMutation.mutate(c.id);
                   }
                 }}
@@ -207,14 +225,13 @@ export function AdminCourts() {
             ))}
           </div>
 
-          {/* Inactive courts */}
           {inactiveCourts.length > 0 && (
-            <div className="mt-8">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 px-1">
-                Inactive Courts
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {inactiveCourts.map(c => (
+            <div className="space-y-4">
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 px-1">
+                Deactivated / Inactive Courts
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {inactiveCourts.map((c) => (
                   <CourtCard
                     key={c.id}
                     court={c}
@@ -222,7 +239,7 @@ export function AdminCourts() {
                     onToggle={() => toggleMutation.mutate({ id: c.id, active: true })}
                     toggling={toggleMutation.isPending && toggleMutation.variables?.id === c.id}
                     onDelete={() => {
-                      if (window.confirm(`Permanently delete "${c.name}"? This cannot be undone.`)) {
+                      if (window.confirm(`Permanently remove "${c.name}"?`)) {
                         deleteMutation.mutate(c.id);
                       }
                     }}
@@ -239,7 +256,12 @@ export function AdminCourts() {
 }
 
 function CourtCard({
-  court, onEdit, onToggle, toggling, onDelete, deleting,
+  court,
+  onEdit,
+  onToggle,
+  toggling,
+  onDelete,
+  deleting,
 }: {
   court: Court;
   onEdit: () => void;
@@ -249,52 +271,52 @@ function CourtCard({
   deleting: boolean;
 }) {
   return (
-    <div className={`bg-white rounded-2xl border p-6 transition-all duration-300 shadow-sm shadow-gray-200/20 ${
-      court.active
-        ? 'border-gray-100 hover:border-primary/30 hover:shadow-md'
-        : 'border-gray-100 opacity-70'
-    }`}>
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <p className="font-bold text-on-surface text-lg tracking-tight">{court.name}</p>
-          {court.active ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full mt-1.5 border border-emerald-100/50">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Active
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-500 bg-gray-100 px-2.5 py-0.5 rounded-full mt-1.5 border border-gray-200/50">
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-              Inactive
-            </span>
-          )}
+    <div
+      className={`bg-white rounded-3xl border p-6 transition-all duration-300 shadow-xl shadow-slate-200/40 flex flex-col justify-between ${
+        court.active ? 'border-slate-200 hover:border-emerald-300' : 'border-slate-200 bg-slate-50/60 opacity-85'
+      }`}
+    >
+      <div>
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h3 className="font-black text-slate-900 text-lg tracking-tight">{court.name}</h3>
+            {court.active ? (
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full mt-2 border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active Online
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 bg-slate-200 px-3 py-1 rounded-full mt-2">
+                Offline / Deactivated
+              </span>
+            )}
+          </div>
+          <Button variant="outline" size="sm" onClick={onEdit} className="rounded-xl font-bold">
+            <Edit2 className="w-3.5 h-3.5 mr-1" /> Edit
+          </Button>
         </div>
-        <Button variant="outline-primary" size="sm" onClick={onEdit}>
-          Edit
-        </Button>
+
+        <div className="space-y-3 text-xs border-t border-slate-100 pt-4 mb-6">
+          <div className="flex justify-between">
+            <span className="text-slate-400 font-bold uppercase tracking-wider">Hours</span>
+            <span className="font-black text-slate-900">
+              {court.openingHours.open.slice(0, 5)} – {court.openingHours.close.slice(0, 5)}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-400 font-bold uppercase tracking-wider">Night Rate Boundary</span>
+            <span className="font-black text-slate-900">{court.dayNightBoundary.slice(0, 5)}</span>
+          </div>
+        </div>
       </div>
 
-      <div className="space-y-2.5 text-sm mb-6 border-t border-gray-50 pt-4">
-        <div className="flex justify-between">
-          <span className="text-on-surface-muted font-medium">Opening Hours</span>
-          <span className="font-bold text-on-surface">
-            {court.openingHours.open.slice(0, 5)} – {court.openingHours.close.slice(0, 5)}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-on-surface-muted font-medium">Day/Night split</span>
-          <span className="font-bold text-on-surface">{court.dayNightBoundary.slice(0, 5)}</span>
-        </div>
-      </div>
-
-      <div className="flex gap-2">
+      <div className="flex gap-2.5 pt-2 border-t border-slate-100">
         {court.active ? (
-          <Button variant="danger" size="sm" className="flex-1" onClick={onToggle} disabled={toggling || deleting}>
-            {toggling ? 'Deactivating…' : 'Deactivate Court'}
+          <Button variant="danger" size="sm" className="flex-1 rounded-xl" onClick={onToggle} disabled={toggling || deleting}>
+            {toggling ? 'Deactivating...' : 'Deactivate'}
           </Button>
         ) : (
-          <Button variant="subtle-primary" size="sm" className="flex-1" onClick={onToggle} disabled={toggling || deleting}>
-            {toggling ? 'Reactivating…' : 'Reactivate Court'}
+          <Button variant="subtle-primary" size="sm" className="flex-1 rounded-xl" onClick={onToggle} disabled={toggling || deleting}>
+            {toggling ? 'Reactivating...' : 'Reactivate'}
           </Button>
         )}
         <Button
@@ -302,9 +324,9 @@ function CourtCard({
           size="sm"
           onClick={onDelete}
           disabled={toggling || deleting}
-          title="Delete permanently (only possible if the court has no bookings)"
+          className="rounded-xl"
         >
-          {deleting ? 'Deleting…' : 'Delete'}
+          {deleting ? 'Deleting...' : 'Delete'}
         </Button>
       </div>
     </div>

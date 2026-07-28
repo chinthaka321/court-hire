@@ -8,6 +8,7 @@ using Stripe;
 using TennisBooking.Auth;
 using TennisBooking.Data;
 using TennisBooking.Jobs;
+using TennisBooking.Json;
 using TennisBooking.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -47,7 +48,10 @@ builder.Services.AddHangfireServer();
 // App services
 builder.Services.AddSingleton<CourtClock>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<IPricingCalculator, PricingCalculator>();
 builder.Services.AddScoped<PricingService>();
+builder.Services.AddScoped<ICourtGridEngine, CourtGridEngine>();
+builder.Services.AddScoped<IPaymentGateway, StripePaymentAdapter>();
 builder.Services.AddScoped<AvailabilityService>();
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<StripeRefundService>();
@@ -57,8 +61,11 @@ builder.Services.AddScoped<SendReminderEmailsJob>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(opt =>
+    {
         opt.JsonSerializerOptions.Converters.Add(
-            new System.Text.Json.Serialization.JsonStringEnumConverter()));
+            new System.Text.Json.Serialization.JsonStringEnumConverter());
+        opt.JsonSerializerOptions.Converters.Add(new TimeOnlyJsonConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

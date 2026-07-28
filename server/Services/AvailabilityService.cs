@@ -8,7 +8,13 @@ public enum SlotStatus { Available, Held, Booked, Past, BlackedOut, BeyondHorizo
 
 public record SlotInfo(DateTime SlotStart, DateTime SlotEnd, SlotStatus Status, decimal Price, bool HeldByMe = false);
 
-public class AvailabilityService(AppDbContext db, PricingService pricing, IConfiguration config, CourtClock clock)
+public class AvailabilityService(
+    AppDbContext db,
+    IPricingCalculator pricing,
+    ICourtGridEngine gridEngine,
+    IConfiguration config,
+    CourtClock clock
+)
 {
     private BookingSettings Settings => config.GetSection("Booking").Get<BookingSettings>() ?? new();
 
@@ -19,7 +25,7 @@ public class AvailabilityService(AppDbContext db, PricingService pricing, IConfi
             .FirstOrDefaultAsync(c => c.Id == courtId && c.Active)
             ?? throw new KeyNotFoundException("Court not found");
 
-        var slots = GenerateGrid(court, date);
+        var slots = gridEngine.GenerateGrid(court, date);
         var now = clock.Now();
         var horizonEnd = now.AddDays(Settings.BookingHorizonDays);
 
@@ -54,48 +60,19 @@ public class AvailabilityService(AppDbContext db, PricingService pricing, IConfi
         return slots.Select(slotStart =>
         {
             var slotEnd = slotStart.AddMinutes(court.SlotLengthMinutes);
-            SlotStatus status;
+            var status = gridEngine.DetermineSlotStatus(
+                court,
+                slotStart,
+                now,
+                horizonEnd,
+                heldSet,
+                bookedSet,
+                blackouts,
+                pricing
+            );
 
-            if (slotStart < now)
-                status = SlotStatus.Past;
-            else if (slotStart > horizonEnd)
-                // Keep the grid honest: hold creation would reject these anyway (#30)
-                status = SlotStatus.BeyondHorizon;
-            else if (blackouts.Any(bl => bl.Start < slotEnd && bl.End > slotStart))
-                status = SlotStatus.BlackedOut;
-            else if (bookedSet.Contains(slotStart))
-                status = SlotStatus.Booked;
-            else if (heldSet.Contains(slotStart))
-                status = SlotStatus.Held;
-            else
-                status = SlotStatus.Available;
-
-            var price = 0m;
-            if (status == SlotStatus.Available)
-            {
-                // A court with no configured rate must not be bookable — show it as closed.
-                var rate = pricing.TryGetPrice(court, slotStart);
-                if (rate is null)
-                    status = SlotStatus.BlackedOut;
-                else
-                    price = rate.Value;
-            }
-
+            var price = status == SlotStatus.Available ? pricing.GetPrice(court, slotStart) : 0m;
             return new SlotInfo(slotStart, slotEnd, status, price, heldByMeSet.Contains(slotStart));
         }).ToList();
-    }
-
-    private static List<DateTime> GenerateGrid(Court court, DateOnly date)
-    {
-        var slots = new List<DateTime>();
-        var open = date.ToDateTime(court.OpeningHours.Open, DateTimeKind.Utc);
-        var close = court.OpeningHours.CloseUtc(date);
-        var current = open;
-        while (current.AddMinutes(court.SlotLengthMinutes) <= close)
-        {
-            slots.Add(current);
-            current = current.AddMinutes(court.SlotLengthMinutes);
-        }
-        return slots;
     }
 }

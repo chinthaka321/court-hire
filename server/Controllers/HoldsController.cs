@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Stripe.Checkout;
 using TennisBooking.Data;
 using TennisBooking.Services;
 
@@ -9,7 +8,15 @@ namespace TennisBooking.Controllers;
 [ApiController]
 [Route("api/holds")]
 [Authorize]
-public class HoldsController(BookingService booking, UserService userService, IConfiguration config, IWebHostEnvironment env, ILogger<HoldsController> logger) : ControllerBase
+public class HoldsController(
+    BookingService booking,
+    UserService userService,
+    IPaymentGateway paymentGateway,
+    AppDbContext db,
+    IConfiguration config,
+    IWebHostEnvironment env,
+    ILogger<HoldsController> logger
+) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateHoldRequest req)
@@ -28,47 +35,31 @@ public class HoldsController(BookingService booking, UserService userService, IC
                 return Ok(new { checkoutUrl = mockUrl, holdGroupId = holdGroup.HoldGroupId });
             }
 
-            var options = new SessionCreateOptions
-            {
-                PaymentMethodTypes = ["card"],
-                LineItems = [new SessionLineItemOptions
-                {
-                    PriceData = new SessionLineItemPriceDataOptions
-                    {
-                        Currency = "usd",
-                        UnitAmountDecimal = holdGroup.TotalPrice * 100,
-                        ProductData = new SessionLineItemPriceDataProductDataOptions
-                        {
-                            Name = $"Tennis Court Booking — {req.SlotStart:MMM d, h:mm tt} ({holdGroup.DurationMinutes} min)"
-                        }
-                    },
-                    Quantity = 1
-                }],
-                Mode = "payment",
-                SuccessUrl = $"{config["App:ClientUrl"]}/booking/confirming?holdGroupId={holdGroup.HoldGroupId}",
-                CancelUrl = $"{config["App:ClientUrl"]}/",
-                Metadata = new Dictionary<string, string> { ["holdGroupId"] = holdGroup.HoldGroupId.ToString() }
-            };
+            var court = await db.Courts.FindAsync(req.CourtId);
+            var courtName = court?.Name ?? "Tennis Court";
+            var slotDetails = $"{req.SlotStart:MMM d, h:mm tt} ({holdGroup.DurationMinutes} min)";
+            var originDomain = config["App:ClientUrl"] ?? "http://localhost:5173";
 
-            Session session;
+            string checkoutUrl;
             try
             {
-                var service = new SessionService();
-                session = await service.CreateAsync(options);
+                checkoutUrl = await paymentGateway.CreateCheckoutSessionAsync(
+                    holdGroup.HoldGroupId,
+                    userId,
+                    holdGroup.TotalPrice,
+                    courtName,
+                    slotDetails,
+                    originDomain
+                );
             }
             catch (Exception ex)
             {
-                // Don't leave the just-created hold locking the slot for the full
-                // TTL when no checkout ever started (#28) — release it so the
-                // user can retry immediately.
                 logger.LogError(ex, "Stripe checkout-session creation failed for hold group {HoldGroupId}", holdGroup.HoldGroupId);
                 await booking.ReleaseHoldGroupAsync(holdGroup.HoldGroupId);
                 return StatusCode(502, new { error = "Payment couldn't be started — please try again." });
             }
 
-            await booking.UpdateHoldGroupSessionAsync(holdGroup.HoldGroupId, session.Id);
-
-            return Ok(new { checkoutUrl = session.Url, holdGroupId = holdGroup.HoldGroupId });
+            return Ok(new { checkoutUrl, holdGroupId = holdGroup.HoldGroupId });
         }
         catch (InvalidOperationException ex)
         {
@@ -80,7 +71,6 @@ public class HoldsController(BookingService booking, UserService userService, IC
         }
         catch (Microsoft.EntityFrameworkCore.DbUpdateException)
         {
-            // Lost the race on UNIQUE(CourtId, SlotStart) — someone held the slot first
             return Conflict(new { error = "Slot is no longer available" });
         }
     }

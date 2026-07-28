@@ -18,4 +18,10 @@ public class Booking
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public bool ReminderSent { get; set; }
     public string? Notes { get; set; } // admin-only free text (e.g. walk-in customer note)
+
+    // Walk-in bookings are recorded under the admin's own UserId (no customer account
+    // exists), so these capture who actually paid. Null for normal Stripe-paid bookings,
+    // where User already identifies the payer.
+    public string? PayerName { get; set; }
+    public string? PayerEmail { get; set; }
 }

@@ -49,7 +49,8 @@ export const createHold = (courtId: string, slotStart: string, slotCount: number
   api.post('/holds', { courtId, slotStart, slotCount }).then(r => r.data);
 
 // Users
-export const getMe = () => api.get('/me').then(r => r.data);
+export const getMe = (params?: { email?: string; name?: string }) =>
+  api.get('/me', { params }).then(r => r.data);
 
 // Bookings
 export const getMyBookings = () => api.get('/bookings').then(r => r.data);
@@ -64,6 +65,7 @@ export const adminGetBookings = (params?: object) =>
   api.get('/admin/bookings', { params }).then(r => r.data);
 export const adminCreateBooking = (data: {
   courtId: string; slotStart: string; slotCount: number; notes?: string;
+  payerName?: string; payerEmail?: string;
 }) => api.post('/admin/bookings', data).then(r => r.data);
 export const adminCancelBooking = (id: string) => api.delete(`/admin/bookings/${id}`);
 export const adminGetPricing = (courtId: string) =>

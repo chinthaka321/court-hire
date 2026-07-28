@@ -13,15 +13,17 @@ public class UserService(AppDbContext db)
     /// Called on first authenticated contact so FK constraints on Holds and
     /// Bookings always have a user to point at.
     /// </summary>
-    public async Task<AppUser> EnsureUserAsync(ClaimsPrincipal principal)
+    public async Task<AppUser> EnsureUserAsync(ClaimsPrincipal principal, string? clientEmail = null, string? clientName = null)
     {
         var sub = principal.FindFirst("sub")?.Value
             ?? throw new UnauthorizedAccessException("Token has no sub claim");
 
         // Clerk's default session token carries only sub; email/name appear
-        // only if the session token is customised in the Clerk dashboard.
-        var email = principal.FindFirst("email")?.Value;
-        var name = principal.FindFirst("name")?.Value;
+        // only if the session token is customised in the Clerk dashboard. Since
+        // that isn't done here, fall back to values the client sends from its
+        // own Clerk SDK session (which always has them) — see MeController.
+        var email = principal.FindFirst("email")?.Value ?? clientEmail;
+        var name = principal.FindFirst("name")?.Value ?? clientName;
 
         var user = await db.Users.FindAsync(sub);
         if (user is null)

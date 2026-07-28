@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser, SignInButton } from '@clerk/clerk-react';
 import { getMyBookings, cancelBooking, getConfig, apiErrorMessage } from '../lib/api';
 import { BookingCard } from '../components/BookingCard';
+import { Button } from '../components/ui/Button';
 import { asWallClock, courtNow } from '../lib/courtTime';
 import type { Booking } from '../types';
 
@@ -48,9 +49,7 @@ export function MyBookings() {
         <h1 className="text-xl font-bold text-on-surface">Sign in to view your bookings</h1>
         <p className="text-sm text-on-surface-muted mt-2 mb-6">Your upcoming and past bookings live here.</p>
         <SignInButton mode="modal">
-          <button className="bg-primary text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-primary-dark transition-colors">
-            Sign In
-          </button>
+          <Button>Sign In</Button>
         </SignInButton>
       </div>
     );
@@ -83,12 +82,9 @@ export function MyBookings() {
         <div className="text-center py-20 bg-white rounded-xl border border-surface-high">
           <p className="text-on-surface font-medium">No bookings yet</p>
           <p className="text-sm text-on-surface-muted mt-1">Book a court to get started</p>
-          <button
-            onClick={() => navigate('/')}
-            className="mt-5 bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-primary-dark transition-colors"
-          >
+          <Button className="mt-5" onClick={() => navigate('/')}>
             Book a Court
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="space-y-8">

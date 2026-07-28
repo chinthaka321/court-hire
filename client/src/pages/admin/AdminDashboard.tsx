@@ -5,6 +5,15 @@ import { adminGetBookings, adminGetCourts } from '../../lib/api';
 import { formatPrice, formatDateTime, toDateOnlyString } from '../../lib/utils';
 import { courtNow } from '../../lib/courtTime';
 import type { AdminBooking, Court } from '../../types';
+import {
+  CalendarCheck,
+  BadgeDollarSign,
+  TrendingUp,
+  Landmark,
+  ArrowRight,
+  Ban,
+  Clock,
+} from 'lucide-react';
 
 interface StatCardProps {
   label: string;
@@ -17,18 +26,18 @@ interface StatCardProps {
 
 function StatCard({ label, value, sub, accent, icon, loading }: StatCardProps) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm shadow-gray-200/40 hover:shadow-md transition-all duration-300 group">
+    <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-300 group">
       <div className="flex items-start justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-semibold text-on-surface-muted uppercase tracking-wider">{label}</p>
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{label}</p>
           {loading ? (
-            <div className="h-8 w-20 bg-gray-100 rounded-lg mt-2 animate-pulse" />
+            <div className="h-9 w-24 bg-slate-200 rounded-xl mt-2 animate-pulse" />
           ) : (
-            <p className={`text-3xl font-extrabold mt-2 tracking-tight ${accent ?? 'text-on-surface'}`}>{value}</p>
+            <p className={`text-3xl font-black mt-2 tracking-tight ${accent ?? 'text-slate-900'}`}>{value}</p>
           )}
-          {sub && <p className="text-xs font-medium text-on-surface-muted mt-1.5">{sub}</p>}
+          {sub && <p className="text-xs font-semibold text-slate-500 mt-1.5">{sub}</p>}
         </div>
-        <div className="p-3.5 bg-gray-50 rounded-2xl text-on-surface-muted group-hover:bg-primary-light group-hover:text-primary transition-all duration-300">
+        <div className="p-4 bg-emerald-50 rounded-2xl text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 shadow-xs">
           {icon}
         </div>
       </div>
@@ -36,14 +45,23 @@ function StatCard({ label, value, sub, accent, icon, loading }: StatCardProps) {
   );
 }
 
+function isWalkIn(b: AdminBooking): boolean {
+  return !!(b.payerName || b.payerEmail);
+}
+
+function playerDisplayName(b: AdminBooking): string {
+  if (isWalkIn(b)) return b.payerName || b.payerEmail || 'Walk-in Customer';
+  return b.user?.name || b.user?.email || 'Walk-in (no account)';
+}
+
 function BookingStateBadge({ state }: { state: string }) {
   const cfg: Record<string, string> = {
-    Completed: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    Cancelled: 'bg-red-50 text-red-600 border-red-100',
-    NoShow:    'bg-gray-100 text-gray-500 border-gray-200',
+    Completed: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    Cancelled: 'bg-rose-100 text-rose-800 border-rose-200',
+    NoShow: 'bg-slate-100 text-slate-600 border-slate-200',
   };
   return (
-    <span className={`inline-flex items-center text-xs font-bold px-3 py-1 rounded-full border ${cfg[state] ?? 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+    <span className={`inline-flex items-center text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border ${cfg[state] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
       {state}
     </span>
   );
@@ -60,8 +78,6 @@ export function AdminDashboard() {
 
   const { data: todayData, isLoading: todayLoading } = useQuery({
     queryKey: ['admin-bookings', 'today', today],
-    // Completed only: a cancelled/refunded booking is neither a booking to
-    // fulfil today nor revenue received (#27)
     queryFn: () => adminGetBookings({ date: today, page: 1, pageSize: 50, state: 'Completed' }),
   });
 
@@ -77,161 +93,146 @@ export function AdminDashboard() {
   const todayRevenue = todayBookings.reduce((sum, b) => sum + b.amountCharged, 0);
   const recentBookings: AdminBooking[] = recentData?.items ?? [];
   const totalBookings: number = recentData?.total ?? 0;
-  const activeCourts = courts.filter(c => c.active).length;
+  const activeCourts = courts.filter((c) => c.active).length;
 
   const quickLinks = [
     {
       to: '/admin/bookings',
       label: 'Manage Bookings',
-      desc: 'View, search, cancel & refund bookings',
-      icon: (
-        <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-          <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-        </svg>
-      )
+      desc: 'View, search, cancel & issue refunds',
+      icon: <CalendarCheck className="w-5 h-5" />,
     },
     {
       to: '/admin/courts',
-      label: 'Courts Config',
-      desc: 'Configure hours, slot lengths, active state',
-      icon: (
-        <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-          <path fillRule="evenodd" d="M5.05 3.636a1 1 0 010 1.414 7 7 0 000 9.9 1 1 0 11-1.414 1.414 9 9 0 010-12.728 1 1 0 011.414 0zm9.9 0a1 1 0 011.414 0 9 9 0 010 12.728 1 1 0 11-1.414-1.414 7 7 0 000-9.9 1 1 0 010-1.414zM10 9a1 1 0 011 1v.01a1 1 0 11-2 0V10a1 1 0 011-1z" clipRule="evenodd" />
-        </svg>
-      )
+      label: 'Courts Configuration',
+      desc: 'Set operating hours, slot length & court status',
+      icon: <Landmark className="w-5 h-5" />,
     },
     {
       to: '/admin/pricing',
-      label: 'Pricing Matrix',
-      desc: 'Set custom peak and day/night rates',
-      icon: (
-        <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
-        </svg>
-      )
+      label: 'Pricing Grid',
+      desc: 'Configure weekday/weekend & day/night rates',
+      icon: <BadgeDollarSign className="w-5 h-5" />,
     },
     {
       to: '/admin/blackouts',
       label: 'Blackouts Manager',
-      desc: 'Block specific times for lessons or maintenance',
-      icon: (
-        <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-          <path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clipRule="evenodd" />
-        </svg>
-      )
+      desc: 'Schedule court maintenance or tournament holds',
+      icon: <Ban className="w-5 h-5" />,
     },
   ];
 
   return (
-    <div className="px-4 sm:px-6 py-8 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-on-surface tracking-tight">Dashboard</h1>
-        <p className="text-sm font-semibold text-primary mt-1.5 flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 bg-primary rounded-full animate-ping" />
-          {now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
+    <div className="px-4 sm:px-8 py-8 max-w-7xl mx-auto space-y-8">
+      {/* Header banner */}
+      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-emerald-950/20 border border-emerald-800/40 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-black uppercase tracking-wider mb-3 backdrop-blur-sm border border-emerald-500/30">
+            <Clock className="w-3.5 h-3.5" /> Real-time Facility Metrics
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
+            Operations Control Center
+          </h1>
+          <p className="text-sm text-emerald-100/80 mt-2 font-medium">
+            Monitor reservations, revenue metrics, and court availability across the complex.
+          </p>
+        </div>
+        <div className="bg-white/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/10 self-start md:self-auto">
+          <span className="text-[10px] uppercase tracking-widest font-black text-emerald-300 block">
+            System Date
+          </span>
+          <span className="text-base font-black text-white">
+            {now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+          </span>
+        </div>
       </div>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
           label="Today's Bookings"
           value={todayCount}
-          sub="confirmed court slots"
+          sub="confirmed court sessions"
           loading={statsLoading}
-          icon={
-            <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-              <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-              <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-            </svg>
-          }
+          icon={<CalendarCheck className="w-6 h-6" />}
         />
         <StatCard
           label="Today's Revenue"
           value={formatPrice(todayRevenue)}
-          sub="received today"
-          accent="text-primary"
+          sub="total collected today"
+          accent="text-emerald-600"
           loading={statsLoading}
-          icon={
-            <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-              <path d="M8.433 7.418c.554-.589 1.448-.589 2.002 0l.207.22 1.477-1.477-.207-.22A4.085 4.085 0 009 4.75V3a1 1 0 10-2 0v1.75a4.1 4.1 0 00-2.514 1.258l-.007.008a1 1 0 01-1.414-1.414l.007-.007A6.1 6.1 0 017 2.85V1a1 1 0 10-2 0v1.85A6.086 6.086 0 001.078 6.847c-.57.575-.56 1.5.02 2.072l.007.007A6.086 6.086 0 005.078 10.85V13a1 1 0 102 0v-2.15a6.086 6.086 0 003.922-2.153l.007-.008a1 1 0 011.414 1.414l-.007.007A6.1 6.1 0 019 12.15V14a1 1 0 102 0v-1.85c.613-.105 1.196-.328 1.72-.65l1.493 1.493a1 1 0 001.414-1.414L14.134 10.1A4.088 4.088 0 0011 8.25V6.582a4.103 4.103 0 00-2.567.836l-.207-.22a4.085 4.085 0 000-2.002l.207.22z" />
-            </svg>
-          }
+          icon={<BadgeDollarSign className="w-6 h-6" />}
         />
         <StatCard
           label="Total Bookings"
           value={totalBookings}
-          sub="aggregate book count"
+          sub="all-time system reservations"
           loading={recentLoading}
-          icon={
-            <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-              <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
-            </svg>
-          }
+          icon={<TrendingUp className="w-6 h-6" />}
         />
         <StatCard
           label="Active Courts"
           value={activeCourts}
-          sub={`online of ${courts.length} total`}
+          sub={`online out of ${courts.length} total`}
           loading={courtsLoading}
-          icon={
-            <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clipRule="evenodd" />
-            </svg>
-          }
+          icon={<Landmark className="w-6 h-6" />}
         />
       </div>
 
-      {/* Recent bookings + quick links */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent bookings card */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm shadow-gray-200/40">
-          <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-            <h2 className="text-lg font-bold text-on-surface">Recent Bookings</h2>
-            <Link to="/admin/bookings" className="text-xs font-bold text-primary hover:text-primary-dark hover:underline flex items-center gap-1">
-              View All Bookings
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
-                <path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+      {/* Recent Bookings & Quick Actions split grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Recent Bookings Table */}
+        <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-xl shadow-slate-200/40">
+          <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-slate-50/50">
+            <h2 className="text-lg font-black text-slate-900">Recent Court Reservations</h2>
+            <Link
+              to="/admin/bookings"
+              className="text-xs font-black uppercase tracking-wider text-emerald-600 hover:text-emerald-700 flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200/60"
+            >
+              View All <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
           {recentLoading ? (
-            <div className="divide-y divide-gray-50 animate-pulse">
-              {Array.from({ length: 4 }).map((_, i) => (
+            <div className="divide-y divide-slate-100 animate-pulse">
+              {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex items-center justify-between px-6 py-4">
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div className="h-4 bg-gray-100 rounded w-32" />
-                    <div className="h-3 bg-gray-100 rounded w-48" />
+                  <div className="space-y-2">
+                    <div className="h-4 bg-slate-200 rounded w-36" />
+                    <div className="h-3 bg-slate-200 rounded w-48" />
                   </div>
-                  <div className="flex items-center gap-4 ml-4 shrink-0">
-                    <div className="h-4 bg-gray-100 rounded w-12" />
-                    <div className="h-6 bg-gray-100 rounded-full w-20" />
-                  </div>
+                  <div className="h-7 bg-slate-200 rounded-full w-20" />
                 </div>
               ))}
             </div>
           ) : recentBookings.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-sm font-semibold text-on-surface-muted">No Bookings Yet</p>
+            <div className="text-center py-16 text-slate-400 font-semibold">
+              No recent court bookings found.
             </div>
           ) : (
-            <div className="divide-y divide-gray-50">
-              {recentBookings.map(b => (
-                <div key={b.id} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50/50 transition-colors duration-200">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-on-surface truncate">
-                      {b.court.name}
-                    </p>
-                    <p className="text-xs text-on-surface-muted mt-1 flex flex-wrap items-center gap-1.5">
-                      <span className="font-semibold text-gray-700">{formatDateTime(b.slotStarts[0])}</span>
-                      <span className="text-gray-300">•</span>
-                      <span className="truncate">{b.user.email}</span>
+            <div className="divide-y divide-slate-100">
+              {recentBookings.map((b) => (
+                <div
+                  key={b.id}
+                  className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-slate-50/80 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-slate-900 text-sm">{b.court.name}</span>
+                      {isWalkIn(b) && (
+                        <span className="text-[9px] font-black uppercase tracking-widest text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full">
+                          Walk-in
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium mt-1">
+                      <span className="font-bold text-slate-700">{formatDateTime(b.slotStarts[0])}</span> •{' '}
+                      {playerDisplayName(b)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-4 ml-4 shrink-0">
-                    <span className="text-base font-extrabold text-on-surface">{formatPrice(b.amountCharged)}</span>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <span className="text-sm font-black text-slate-900">{formatPrice(b.amountCharged)}</span>
                     <BookingStateBadge state={b.state} />
                   </div>
                 </div>
@@ -240,29 +241,31 @@ export function AdminDashboard() {
           )}
         </div>
 
-        {/* Quick links side cards */}
-        <div className="flex flex-col gap-3.5">
-          <h2 className="text-lg font-bold text-on-surface px-1 mb-0.5">Quick Actions</h2>
-          {quickLinks.map(l => (
-            <Link
-              key={l.to}
-              to={l.to}
-              className="bg-white rounded-2xl border border-gray-100 p-5 hover:border-primary/40 hover:bg-emerald-50/10 transition-all duration-300 group flex items-start gap-4 shadow-sm shadow-gray-200/30"
-            >
-              <div className="p-3 bg-gray-50 rounded-xl text-on-surface-muted group-hover:bg-primary-light group-hover:text-primary transition-all duration-300 shrink-0">
-                {l.icon}
-              </div>
-              <div className="min-w-0">
-                <p className="font-bold text-on-surface group-hover:text-primary transition-colors duration-200 flex items-center gap-1">
-                  {l.label}
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 text-primary">
-                    <path d="M6 3l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </p>
-                <p className="text-xs font-medium text-on-surface-muted mt-1 leading-normal">{l.desc}</p>
-              </div>
-            </Link>
-          ))}
+        {/* Quick Action Navigation */}
+        <div className="space-y-4">
+          <h2 className="text-lg font-black text-slate-900 px-1">Quick Operations</h2>
+          <div className="flex flex-col gap-3.5">
+            {quickLinks.map((l) => (
+              <Link
+                key={l.to}
+                to={l.to}
+                className="bg-white rounded-3xl border border-slate-200/80 p-5 hover:border-emerald-500 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 group flex items-start gap-4 shadow-sm shadow-slate-200/40"
+              >
+                <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 shrink-0 shadow-xs">
+                  {l.icon}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-black text-slate-900 group-hover:text-emerald-600 transition-colors flex items-center justify-between text-sm">
+                    <span>{l.label}</span>
+                    <ArrowRight className="w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-emerald-600" />
+                  </p>
+                  <p className="text-xs font-semibold text-slate-400 mt-1 leading-relaxed">
+                    {l.desc}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
     </div>

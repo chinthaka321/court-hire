@@ -44,6 +44,9 @@ export interface Booking {
 /** Booking as returned by the admin endpoints — includes the customer. */
 export interface AdminBooking extends Booking {
   user: { id: string; email: string; name?: string | null };
+  /** Set for walk-in bookings only — `user` is the admin who created it, not the payer. */
+  payerName?: string | null;
+  payerEmail?: string | null;
 }
 
 export interface PriceRate {
