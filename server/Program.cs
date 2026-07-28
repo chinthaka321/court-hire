@@ -13,14 +13,11 @@ using TennisBooking.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Stripe
 StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
 
-// Database
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
-// Auth — Clerk JWT
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opt =>
     {
@@ -38,23 +35,19 @@ builder.Services.AddAuthorization(opt =>
     opt.AddPolicy("AdminOnly", p => p.AddRequirements(new AdminRequirement())));
 builder.Services.AddScoped<IAuthorizationHandler, AdminAuthorizationHandler>();
 
-// Hangfire
 builder.Services.AddHangfire(cfg => cfg
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
     .UsePostgreSqlStorage(builder.Configuration.GetConnectionString("Default")));
 builder.Services.AddHangfireServer();
 
-// App services
 builder.Services.AddSingleton<CourtClock>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<IPricingCalculator, PricingCalculator>();
-builder.Services.AddScoped<PricingService>();
 builder.Services.AddScoped<ICourtGridEngine, CourtGridEngine>();
 builder.Services.AddScoped<IPaymentGateway, StripePaymentAdapter>();
 builder.Services.AddScoped<AvailabilityService>();
 builder.Services.AddScoped<BookingService>();
-builder.Services.AddScoped<StripeRefundService>();
 builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<SweepExpiredHoldsJob>();
 builder.Services.AddScoped<SendReminderEmailsJob>();
@@ -76,13 +69,11 @@ builder.Services.AddCors(opt => opt.AddPolicy("ClientApp", p =>
 
 var app = builder.Build();
 
-// Auto-migrate on startup
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
 
-    // Auto-promote first user to Admin in Development mode if no Admin exists
     var dbUsers = db.Users.ToList();
     if (app.Environment.IsDevelopment() && !dbUsers.Any(u => u.Role == TennisBooking.Models.UserRole.Admin) && dbUsers.Any())
     {
@@ -154,16 +145,15 @@ app.UseAuthorization();
 if (app.Environment.IsDevelopment())
     app.UseHangfireDashboard("/hangfire");
 
-// Register recurring jobs
 RecurringJob.AddOrUpdate<SweepExpiredHoldsJob>(
     "sweep-expired-holds",
     job => job.ExecuteAsync(),
-    "*/2 * * * *"); // every 2 min
+    "*/2 * * * *");
 
 RecurringJob.AddOrUpdate<SendReminderEmailsJob>(
     "send-reminders",
     job => job.ExecuteAsync(),
-    "*/15 * * * *"); // every 15 min
+    "*/15 * * * *");
 
 app.MapControllers();
 app.Run();

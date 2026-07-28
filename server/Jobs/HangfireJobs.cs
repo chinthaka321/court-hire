@@ -26,7 +26,6 @@ public class SendReminderEmailsJob(AppDbContext db, EmailService email, IConfigu
     {
         var hoursBefore = config.GetSection("Booking").Get<BookingSettings>()?.ReminderHoursBefore ?? 24;
 
-        // Any not-yet-reminded booking starting within the reminder horizon.
         // ReminderSent prevents duplicates, so a delayed job run can't skip bookings.
         var now = clock.Now();
         var cutoff = now.AddHours(hoursBefore);
@@ -42,7 +41,7 @@ public class SendReminderEmailsJob(AppDbContext db, EmailService email, IConfigu
 
         foreach (var booking in upcoming)
         {
-            // Mark-and-save per booking, and only on a successful send (#34):
+            // Mark-and-save per booking, and only on a successful send:
             // a mail outage must mean "retry next run", not silent permanent skip,
             // and a failed batch save must not re-send already-delivered reminders.
             if (await email.SendBookingReminderAsync(booking))

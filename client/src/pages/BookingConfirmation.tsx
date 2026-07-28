@@ -8,6 +8,7 @@ import { useMe } from '../hooks/useMe';
 import { Button } from '../components/ui/Button';
 import { Input, Field } from '../components/ui/Input';
 import { useToast } from '../components/ui/ToastContext';
+import { sanitizeInput } from '../lib/security';
 import { ArrowLeft, Clock, AlertTriangle } from 'lucide-react';
 
 export function BookingConfirmation() {
@@ -63,9 +64,9 @@ export function BookingConfirmation() {
           courtId: courtId!,
           slotStart: slotDate,
           slotCount,
-          notes: notes || undefined,
-          payerName: payerName.trim() || undefined,
-          payerEmail: payerEmail.trim() || undefined,
+          notes: sanitizeInput(notes) || undefined,
+          payerName: sanitizeInput(payerName) || undefined,
+          payerEmail: sanitizeInput(payerEmail) || undefined,
         });
         showToast('Walk-in booking successfully created!', 'success');
         navigate('/admin/bookings');
@@ -102,7 +103,6 @@ export function BookingConfirmation() {
       <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl p-6 sm:p-8">
         <h1 className="text-2xl font-black text-slate-900 mb-6">Confirm Reservation</h1>
 
-        {/* Booking details */}
         <div className="bg-slate-50/80 rounded-2xl border border-slate-100 divide-y divide-slate-100 mb-6 overflow-hidden">
           <Row label="Court" value={court.name} />
           <Row label="Date & Start Time" value={formatDateTime(slotDate)} />
@@ -110,7 +110,6 @@ export function BookingConfirmation() {
           <Row label="Estimated End" value={formatDateTime(slotEnd)} />
         </div>
 
-        {/* Price summary */}
         <div className="bg-gradient-to-r from-emerald-900 to-teal-900 rounded-2xl px-6 py-5 flex items-center justify-between text-white mb-6 shadow-md shadow-emerald-900/20">
           <div>
             <span className="text-xs uppercase font-bold text-emerald-200 tracking-wider block">Total Payable</span>

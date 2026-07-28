@@ -26,9 +26,7 @@ export function AdminLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950">
-      {/* Sidebar — desktop */}
       <aside className="hidden md:flex flex-col w-64 shrink-0 bg-slate-950 border-r border-emerald-500/20 shadow-2xl">
-        {/* Sidebar brand header */}
         <div className="flex items-center gap-3 px-6 h-20 border-b border-emerald-500/20 shrink-0">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/30">
             <CircleDot className="w-6 h-6 text-white animate-pulse" />
@@ -43,7 +41,6 @@ export function AdminLayout() {
           </div>
         </div>
 
-        {/* Nav links */}
         <nav className="flex-1 px-3 py-6 flex flex-col gap-1.5 overflow-y-auto">
           <div className="px-3 mb-2 text-[10px] uppercase tracking-widest font-extrabold text-slate-500">
             Management Modules
@@ -67,7 +64,6 @@ export function AdminLayout() {
           ))}
         </nav>
 
-        {/* Exit & Role info footer */}
         <div className="p-4 m-3 rounded-2xl bg-slate-900/90 border border-emerald-500/20 shadow-inner">
           <div className="flex items-center gap-2 mb-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
@@ -85,9 +81,7 @@ export function AdminLayout() {
         </div>
       </aside>
 
-      {/* Main content area */}
       <div className="flex-1 min-w-0 flex flex-col bg-slate-50 overflow-hidden">
-        {/* Top header bar */}
         <header className="hidden md:flex items-center justify-between h-20 px-8 bg-white border-b border-slate-200 shadow-sm shrink-0">
           <div className="flex items-center gap-3">
             <span className="text-xs uppercase font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 rounded-full">
@@ -107,13 +101,11 @@ export function AdminLayout() {
           </div>
         </header>
 
-        {/* Scrollable page view */}
         <main className="flex-1 overflow-y-auto pb-20 md:pb-8">
           <Outlet />
         </main>
       </div>
 
-      {/* Bottom nav — mobile only */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950 flex z-50 border-t border-emerald-500/20 shadow-2xl">
         {NAV.map(({ to, label, end, icon: Icon }) => (
           <NavLink

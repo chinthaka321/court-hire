@@ -158,16 +158,6 @@ public class BookingService(
         }
     }
 
-    public async Task UpdateHoldGroupSessionAsync(Guid holdGroupId, string sessionId)
-    {
-        var holds = await db.Holds
-            .Where(h => h.HoldGroupId == holdGroupId)
-            .ToListAsync();
-        foreach (var hold in holds)
-            hold.StripeSessionId = sessionId;
-        await db.SaveChangesAsync();
-    }
-
     public async Task RescheduleBookingAsync(Guid bookingId, DateTime newSlotStart, string requestingUserId)
     {
         var booking = await db.Bookings

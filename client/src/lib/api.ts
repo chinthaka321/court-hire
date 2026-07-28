@@ -17,7 +17,7 @@ export function setAuthToken(token: string | null) {
 /** Extracts the server's `{ error }` message from a failed request, or falls back. */
 export function apiErrorMessage(e: unknown, fallback: string): string {
   if (axios.isAxiosError(e)) {
-    // A bare 401 means the session expired — never blame the slot/action for it (#36)
+    // A bare 401 means the session expired — never blame the slot/action for it
     if (e.response?.status === 401) {
       return 'Your session has expired — please sign in again and retry.';
     }
@@ -36,23 +36,18 @@ export const getConfig = () =>
     timeZoneId: string;
   });
 
-// Courts
 export const getCourts = () => api.get('/courts').then(r => r.data);
 export const getCourt = (id: string) => api.get(`/courts/${id}`).then(r => r.data);
 
-// Availability
 export const getAvailability = (courtId: string, date: string) =>
   api.get('/availability', { params: { courtId, date } }).then(r => r.data);
 
-// Holds
 export const createHold = (courtId: string, slotStart: string, slotCount: number = 1) =>
   api.post('/holds', { courtId, slotStart, slotCount }).then(r => r.data);
 
-// Users
 export const getMe = (params?: { email?: string; name?: string }) =>
   api.get('/me', { params }).then(r => r.data);
 
-// Bookings
 export const getMyBookings = () => api.get('/bookings').then(r => r.data);
 export const cancelBooking = (id: string) => api.delete(`/bookings/${id}`);
 export const rescheduleBooking = (id: string, newSlotStart: string) =>
@@ -60,7 +55,6 @@ export const rescheduleBooking = (id: string, newSlotStart: string) =>
 export const pollBookingByHoldGroup = (holdGroupId: string) =>
   api.get(`/bookings/by-hold-group/${holdGroupId}`).then(r => r.data);
 
-// Admin
 export const adminGetBookings = (params?: object) =>
   api.get('/admin/bookings', { params }).then(r => r.data);
 export const adminCreateBooking = (data: {

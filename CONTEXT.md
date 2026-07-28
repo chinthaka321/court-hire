@@ -30,6 +30,14 @@ _Avoid_: booking duration, slot duration, session length
 The computed set of bookable slots for a court on a given day: full time grid minus booked, held, and blacked-out intervals.
 _Avoid_: calendar, schedule, open slots
 
+**Court Grid Engine**:
+The pure domain engine responsible for computing slot start times from court opening hours, grouping slots into session spans, and validating slot availability against booking horizons, blackouts, and past slot boundaries.
+_Avoid_: slot generator, calendar builder
+
+**7-Day Week View**:
+A multi-day calendar view displaying real-time open slots and prices across 7 consecutive days for a selected court, complete with week navigation controls.
+_Avoid_: week calendar, full week schedule
+
 **Blackout**:
 An admin-defined interval during which a court is unavailable. Subtracted from the availability grid at read time. A Blackout does not cancel or touch existing Bookings inside its window — it can overlap paid Bookings, which then simply stop appearing in the availability grid (shown as blacked-out) while the Booking itself is untouched. The admin is warned about such conflicts at creation time but may proceed anyway (see ADR-0012).
 _Avoid_: block, closure, maintenance window
@@ -84,6 +92,10 @@ _Avoid_: refund window, cancellation period
 Moving a Booking to a new start time as an atomic slot swap: same court (permanent constraint, not a V1 gap — cross-court reschedule is not planned), same slot count, and the new span's total price must exactly equal the original `amount_charged`. No money moves. If the new time's price differs, the user must cancel (per the Cancellation window) and rebook instead. See ADR-0004.
 _Avoid_: rebook, move booking, change time
 
+**Payment Gateway Seam**:
+The domain interface abstracting third-party payment infrastructure (Stripe Checkout sessions, webhook verification, and refund processing).
+_Avoid_: payment wrapper, stripe client
+
 ### Packages
 
 **Package**:
@@ -99,6 +111,10 @@ _Avoid_: credit, redemption unit, session slot
 **Rate table**:
 A 2×2 grid of prices per court: `(day_type, band) → price`. Admin edits this directly; there is no rule engine.
 _Avoid_: pricing rules, price list, tariff
+
+**Pricing Calculator**:
+The domain module that looks up prices in the rate table based on day type (`weekday`/`weekend`) and band (`day`/`night`), and accumulates total prices for multi-slot sessions.
+_Avoid_: price engine, tariff evaluator
 
 **Preview price**:
 The price shown to a user on the booking confirmation screen, taken from the availability grid at the time the slot was tapped. Not authoritative — may differ from the captured price if an admin changes the rate table before the user clicks Pay.

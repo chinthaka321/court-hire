@@ -49,7 +49,6 @@ export function SlotCell({ slot, selected, onClick, priceMismatch }: Props) {
         selected && 'bg-primary-light border-l-4 border-l-primary',
       )}
     >
-      {/* Left: time */}
       <div aria-hidden="true" className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
         {isAvailable && (
           <div className={cn(
@@ -73,7 +72,6 @@ export function SlotCell({ slot, selected, onClick, priceMismatch }: Props) {
         </span>
       </div>
 
-      {/* Right: price + status + CTA */}
       <div aria-hidden="true" className="flex items-center gap-2 sm:gap-4 shrink-0">
         {isAvailable && (
           <>

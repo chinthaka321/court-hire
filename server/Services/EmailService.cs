@@ -70,7 +70,7 @@ public class EmailService(IConfiguration config, ILogger<EmailService> logger)
     }
 
     /// <summary>Returns true only if the reminder was actually handed to the mail server —
-    /// the caller must not mark the booking as reminded otherwise (#34).</summary>
+    /// the caller must not mark the booking as reminded otherwise.</summary>
     public async Task<bool> SendBookingReminderAsync(Booking booking)
     {
         var slot = booking.SlotStarts.Min();

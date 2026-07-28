@@ -11,7 +11,4 @@ public class AppUser
     public string? Phone { get; set; }
     public SkillLevel SkillLevel { get; set; } = SkillLevel.Beginner;
     public UserRole Role { get; set; } = UserRole.User;
-
-    public ICollection<Hold> Holds { get; set; } = [];
-    public ICollection<Booking> Bookings { get; set; } = [];
 }

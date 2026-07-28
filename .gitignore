@@ -4,6 +4,7 @@
 .mcp.json
 skills-lock.json
 .scratch/
+.playwright-mcp/
 
 # ── .NET ──────────────────────────────────────────────────────────────────────
 **/bin/

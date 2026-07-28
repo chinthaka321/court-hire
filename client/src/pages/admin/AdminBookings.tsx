@@ -4,44 +4,11 @@ import { adminGetBookings, adminCancelBooking, getConfig, apiErrorMessage } from
 import type { AdminBooking } from '../../types';
 import { formatDateTime, formatPrice } from '../../lib/utils';
 import { asWallClock, courtNow } from '../../lib/courtTime';
+import { isWalkIn, playerDisplayName, playerSecondaryLine, playerInitial, bookingDurationMinutes } from '../../lib/booking';
 import { Button } from '../../components/ui/Button';
 import { Input, Field } from '../../components/ui/Input';
+import { BookingStateBadge } from '../../components/ui/BookingStateBadge';
 import { useToast } from '../../components/ui/ToastContext';
-
-
-function isWalkIn(b: AdminBooking): boolean {
-  return !!(b.payerName || b.payerEmail);
-}
-
-function playerDisplayName(b: AdminBooking): string {
-  if (isWalkIn(b)) return b.payerName || b.payerEmail || 'Walk-in Customer';
-  return b.user?.name || b.user?.email || 'Walk-in (no account)';
-}
-
-function playerSecondaryLine(b: AdminBooking): string | null {
-  if (isWalkIn(b)) {
-    return b.payerName && b.payerEmail ? b.payerEmail : null;
-  }
-  return b.user?.name && b.user?.email ? b.user.email : null;
-}
-
-function playerInitial(b: AdminBooking) {
-  const source = playerDisplayName(b);
-  return source ? source.trim().charAt(0).toUpperCase() : '?';
-}
-
-function StateBadge({ state }: { state: string }) {
-  const cfg: Record<string, string> = {
-    Completed: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    Cancelled: 'bg-slate-100 text-slate-600 border-slate-200',
-    NoShow: 'bg-rose-100 text-rose-800 border-rose-200',
-  };
-  return (
-    <span className={`inline-flex items-center text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border ${cfg[state] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-      {state === 'NoShow' ? 'No-show' : state}
-    </span>
-  );
-}
 
 function cancelConfirmMessage(b: AdminBooking, windowHours: number) {
   const outsideWindow = courtNow().getTime() > asWallClock(b.slotStarts[0]).getTime() - windowHours * 3_600_000;
@@ -96,7 +63,6 @@ export function AdminBookings() {
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-black text-slate-900 tracking-tight">Bookings Directory</h1>
         <p className="text-sm font-semibold text-slate-500 mt-1">
@@ -104,7 +70,6 @@ export function AdminBookings() {
         </p>
       </div>
 
-      {/* Filters bar */}
       <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xl shadow-slate-200/40 flex flex-wrap gap-4 items-end">
         <div>
           <Field label="Filter Date" htmlFor="filter-date">
@@ -146,7 +111,6 @@ export function AdminBookings() {
         )}
       </div>
 
-      {/* Bookings table */}
       {isLoading ? (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden animate-pulse">
           <div className="h-12 bg-slate-100" />
@@ -228,7 +192,7 @@ export function AdminBookings() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <p className="text-sm font-bold text-slate-900">{formatDateTime(b.slotStarts[0])}</p>
                           <p className="text-xs font-semibold text-slate-400 mt-0.5">
-                            {b.slotStarts.length * 30} min session
+                            {bookingDurationMinutes(b)} min session
                           </p>
                         </td>
 
@@ -237,7 +201,7 @@ export function AdminBookings() {
                         </td>
 
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <StateBadge state={b.state} />
+                          <BookingStateBadge state={b.state} />
                         </td>
 
                         <td className="px-6 py-4 text-right whitespace-nowrap">
@@ -272,7 +236,6 @@ export function AdminBookings() {
         </div>
       )}
 
-      {/* Pagination control */}
       <div className="flex items-center justify-between text-xs font-bold text-slate-500">
         <span>Showing {total} total records</span>
         <div className="flex items-center gap-2">

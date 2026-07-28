@@ -23,7 +23,7 @@ public class AdminController(
     {
         var courts = await db.Courts
             .AsNoTracking()
-            .Select(c => new { c.Id, c.Name, c.SlotLengthMinutes, c.OpeningHours, c.DayNightBoundary, c.Active })
+            .Select(CourtDto.Projection)
             .ToListAsync();
         return Ok(courts);
     }
@@ -218,17 +218,10 @@ public class AdminController(
 
         if (!string.IsNullOrEmpty(booking.StripePaymentIntentId))
         {
-            try
-            {
-                booking.StripeRefundId = await paymentGateway.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
-                await db.SaveChangesAsync();
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Refund failed for admin-cancelled booking {BookingId} (paymentIntent {PaymentIntent})", id, booking.StripePaymentIntentId);
-                await emailService.SendBookingCancelledAsync(booking);
-                return StatusCode(502, new { error = "The booking was cancelled, but the Stripe refund failed. Issue the refund manually in the Stripe dashboard (payment intent " + booking.StripePaymentIntentId + ")." });
-            }
+            var paymentIntentId = booking.StripePaymentIntentId;
+            var refunded = await RefundHelper.TryRefundAsync(booking, paymentGateway, db, emailService, logger, id);
+            if (!refunded)
+                return StatusCode(502, new { error = "The booking was cancelled, but the Stripe refund failed. Issue the refund manually in the Stripe dashboard (payment intent " + paymentIntentId + ")." });
         }
 
         await emailService.SendBookingCancelledAsync(booking);

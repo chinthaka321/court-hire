@@ -15,7 +15,6 @@ public class AvailabilityController(AvailabilityService availability) : Controll
 
         try
         {
-            // Optional — lets signed-in users see their own holds as resumable (#31)
             var userId = User.FindFirst("sub")?.Value;
             var slots = await availability.GetAvailabilityAsync(courtId, date.Value, userId);
             return Ok(slots);

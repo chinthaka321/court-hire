@@ -26,7 +26,4 @@ public class Court
     public bool Active { get; set; } = true;
 
     public ICollection<PriceRate> PriceRates { get; set; } = [];
-    public ICollection<Hold> Holds { get; set; } = [];
-    public ICollection<Booking> Bookings { get; set; } = [];
-    public ICollection<Blackout> Blackouts { get; set; } = [];
 }

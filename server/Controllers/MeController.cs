@@ -9,13 +9,8 @@ namespace TennisBooking.Controllers;
 [Authorize]
 public class MeController(UserService users) : ControllerBase
 {
-    /// <summary>
-    /// Returns the current user's profile and role, creating the DB row on
-    /// first contact. The client calls this after sign-in, which is what
-    /// provisions new users. email/name are optional query params the client
-    /// fills from its own Clerk session (the JWT itself usually only carries
-    /// `sub` — see UserService.EnsureUserAsync).
-    /// </summary>
+    // email/name are optional query params the client fills from its own Clerk session —
+    // the JWT itself usually only carries `sub` (see UserService.EnsureUserAsync).
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] string? email, [FromQuery] string? name)
     {

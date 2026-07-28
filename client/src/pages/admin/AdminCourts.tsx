@@ -99,7 +99,6 @@ export function AdminCourts() {
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-5xl mx-auto space-y-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Courts Manager</h1>
@@ -121,7 +120,6 @@ export function AdminCourts() {
         )}
       </div>
 
-      {/* Add / Edit Form */}
       {showForm && (
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-2xl space-y-6">
           <h2 className="text-xl font-black text-slate-900">
@@ -195,7 +193,6 @@ export function AdminCourts() {
         </div>
       )}
 
-      {/* Courts list */}
       {courts.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-xl">
           <p className="text-lg font-bold text-slate-800">No Courts Configured</p>

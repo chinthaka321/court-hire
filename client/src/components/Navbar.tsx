@@ -24,7 +24,6 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 bg-slate-950/90 backdrop-blur-xl border-b border-emerald-500/20 shadow-xl transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-18">
-          {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/30 group-hover:scale-105 transition-all duration-300">
               <CircleDot className="w-6 h-6 text-white animate-pulse" />
@@ -39,7 +38,6 @@ export function Navbar() {
             </div>
           </Link>
 
-          {/* Desktop nav links */}
           <div className="hidden md:flex items-center gap-2">
             {navLinks.map(({ to, label, exact }) => {
               const active = isActive(to, exact);
@@ -62,7 +60,6 @@ export function Navbar() {
             })}
           </div>
 
-          {/* User profile & action controls */}
           <div className="flex items-center gap-3">
             {isAdmin && (
               <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-emerald-300 bg-emerald-950/80 border border-emerald-600/40 px-3 py-1 rounded-full shadow-xs">
@@ -93,7 +90,6 @@ export function Navbar() {
               )
             )}
 
-            {/* Mobile menu toggle */}
             <button
               onClick={() => setMobileOpen((o) => !o)}
               className="md:hidden p-2 rounded-xl text-slate-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
@@ -105,7 +101,6 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Menu Drawer */}
       {mobileOpen && (
         <div className="md:hidden border-t border-emerald-500/20 bg-slate-950/95 backdrop-blur-2xl px-4 py-4 flex flex-col gap-2 animate-in slide-in-from-top-2">
           {navLinks.map(({ to, label, exact }) => (

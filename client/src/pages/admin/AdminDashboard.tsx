@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { adminGetBookings, adminGetCourts } from '../../lib/api';
 import { formatPrice, formatDateTime, toDateOnlyString } from '../../lib/utils';
 import { courtNow } from '../../lib/courtTime';
+import { isWalkIn, playerDisplayName } from '../../lib/booking';
+import { BookingStateBadge } from '../../components/ui/BookingStateBadge';
 import type { AdminBooking, Court } from '../../types';
 import {
   CalendarCheck,
@@ -42,28 +44,6 @@ function StatCard({ label, value, sub, accent, icon, loading }: StatCardProps) {
         </div>
       </div>
     </div>
-  );
-}
-
-function isWalkIn(b: AdminBooking): boolean {
-  return !!(b.payerName || b.payerEmail);
-}
-
-function playerDisplayName(b: AdminBooking): string {
-  if (isWalkIn(b)) return b.payerName || b.payerEmail || 'Walk-in Customer';
-  return b.user?.name || b.user?.email || 'Walk-in (no account)';
-}
-
-function BookingStateBadge({ state }: { state: string }) {
-  const cfg: Record<string, string> = {
-    Completed: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    Cancelled: 'bg-rose-100 text-rose-800 border-rose-200',
-    NoShow: 'bg-slate-100 text-slate-600 border-slate-200',
-  };
-  return (
-    <span className={`inline-flex items-center text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border ${cfg[state] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-      {state}
-    </span>
   );
 }
 
@@ -124,7 +104,6 @@ export function AdminDashboard() {
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-7xl mx-auto space-y-8">
-      {/* Header banner */}
       <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-emerald-950/20 border border-emerald-800/40 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-black uppercase tracking-wider mb-3 backdrop-blur-sm border border-emerald-500/30">
@@ -147,7 +126,6 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
           label="Today's Bookings"
@@ -180,9 +158,7 @@ export function AdminDashboard() {
         />
       </div>
 
-      {/* Recent Bookings & Quick Actions split grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recent Bookings Table */}
         <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-xl shadow-slate-200/40">
           <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-slate-50/50">
             <h2 className="text-lg font-black text-slate-900">Recent Court Reservations</h2>
@@ -241,7 +217,6 @@ export function AdminDashboard() {
           )}
         </div>
 
-        {/* Quick Action Navigation */}
         <div className="space-y-4">
           <h2 className="text-lg font-black text-slate-900 px-1">Quick Operations</h2>
           <div className="flex flex-col gap-3.5">

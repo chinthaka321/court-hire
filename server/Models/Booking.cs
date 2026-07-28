@@ -5,7 +5,7 @@ public enum BookingState { Completed, Cancelled, NoShow }
 public class Booking
 {
     public Guid Id { get; set; }
-    public Guid? HoldGroupId { get; set; } // links back to the Hold group that produced this booking
+    public Guid? HoldGroupId { get; set; }
     public Guid CourtId { get; set; }
     public Court Court { get; set; } = null!;
     public List<DateTime> SlotStarts { get; set; } = [];

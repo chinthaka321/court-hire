@@ -64,17 +64,9 @@ public class BookingsController(
 
             if (refundDue && !string.IsNullOrEmpty(booking.StripePaymentIntentId))
             {
-                try
-                {
-                    booking.StripeRefundId = await paymentGateway.RefundAsync(booking.StripePaymentIntentId, booking.AmountCharged, id);
-                    await db.SaveChangesAsync();
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Refund failed for cancelled booking {BookingId} (paymentIntent {PaymentIntent})", id, booking.StripePaymentIntentId);
-                    await emailService.SendBookingCancelledAsync(booking);
+                var refunded = await RefundHelper.TryRefundAsync(booking, paymentGateway, db, emailService, logger, id);
+                if (!refunded)
                     return StatusCode(502, new { error = "Your booking was cancelled, but the refund could not be processed automatically. Our staff have been notified and will issue it manually." });
-                }
             }
 
             await emailService.SendBookingCancelledAsync(booking);

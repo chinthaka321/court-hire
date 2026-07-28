@@ -17,9 +17,7 @@ public class CourtsController(AppDbContext db, CourtClock clock) : ControllerBas
         var courts = await db.Courts
             .AsNoTracking()
             .Where(c => c.Active)
-            .Select(c => new {
-                c.Id, c.Name, c.SlotLengthMinutes, c.OpeningHours, c.DayNightBoundary, c.Active
-            })
+            .Select(CourtDto.Projection)
             .ToListAsync();
         return Ok(courts);
     }
@@ -30,14 +28,11 @@ public class CourtsController(AppDbContext db, CourtClock clock) : ControllerBas
         var court = await db.Courts
             .AsNoTracking()
             .Where(c => c.Id == id)
-            .Select(c => new {
-                c.Id, c.Name, c.SlotLengthMinutes, c.OpeningHours, c.DayNightBoundary, c.Active
-            })
+            .Select(CourtDto.Projection)
             .FirstOrDefaultAsync();
         return court is null ? NotFound() : Ok(court);
     }
 
-    /// <summary>Shared create/update validation. Returns an error message or null.</summary>
     private static string? ValidateCourtRequest(CreateCourtRequest req)
     {
         if (string.IsNullOrWhiteSpace(req.Name))
@@ -48,7 +43,7 @@ public class CourtsController(AppDbContext db, CourtClock clock) : ControllerBas
             return "Slot length must be exactly 30 minutes.";
 
         // Boundary outside opening hours would make one whole pricing band
-        // unreachable — every slot silently priced from the other band (#25).
+        // unreachable — every slot silently priced from the other band.
         var boundaryTooEarly = req.DayNightBoundary < req.Open;
         var boundaryTooLate = req.Close != TimeOnly.MinValue && req.DayNightBoundary > req.Close;
         if ((boundaryTooEarly && req.DayNightBoundary != TimeOnly.MinValue) || boundaryTooLate)
@@ -76,9 +71,7 @@ public class CourtsController(AppDbContext db, CourtClock clock) : ControllerBas
         };
         db.Courts.Add(court);
         await db.SaveChangesAsync();
-        return Ok(new {
-            court.Id, court.Name, court.SlotLengthMinutes, court.OpeningHours, court.DayNightBoundary, court.Active
-        });
+        return Ok(new CourtDto(court.Id, court.Name, court.SlotLengthMinutes, court.OpeningHours, court.DayNightBoundary, court.Active));
     }
 
     [HttpPut("{id:guid}"), Authorize(Policy = "AdminOnly")]
@@ -97,9 +90,7 @@ public class CourtsController(AppDbContext db, CourtClock clock) : ControllerBas
         court.SlotLengthMinutes = req.SlotLengthMinutes;
         court.DayNightBoundary = req.DayNightBoundary;
         await db.SaveChangesAsync();
-        return Ok(new {
-            court.Id, court.Name, court.SlotLengthMinutes, court.OpeningHours, court.DayNightBoundary, court.Active
-        });
+        return Ok(new CourtDto(court.Id, court.Name, court.SlotLengthMinutes, court.OpeningHours, court.DayNightBoundary, court.Active));
     }
 
     [HttpDelete("{id:guid}"), Authorize(Policy = "AdminOnly")]
