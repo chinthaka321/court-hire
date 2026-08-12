@@ -45,28 +45,6 @@ public class AdminController(
         return Ok(rates);
     }
 
-    [HttpPut("courts/{courtId:guid}/pricing")]
-    public async Task<IActionResult> UpsertPricing(Guid courtId, [FromBody] List<UpsertRateRequest> rates)
-    {
-        var existing = await db.PriceRates.Where(p => p.CourtId == courtId).ToListAsync();
-        db.PriceRates.RemoveRange(existing);
-
-        foreach (var r in rates)
-        {
-            db.PriceRates.Add(new PriceRate
-            {
-                Id = Guid.NewGuid(),
-                CourtId = courtId,
-                DayType = r.DayType,
-                Band = r.Band,
-                Price = r.Price
-            });
-        }
-
-        await db.SaveChangesAsync();
-        return NoContent();
-    }
-
     [HttpGet("blackouts")]
     public async Task<IActionResult> GetBlackouts([FromQuery] Guid? courtId)
     {

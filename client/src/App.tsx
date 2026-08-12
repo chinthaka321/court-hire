@@ -17,7 +17,6 @@ import { ToastProvider } from './components/ui/ToastContext';
 // Lazy load admin pages for optimal bundle splitting
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const AdminCourts = lazy(() => import('./pages/admin/AdminCourts').then(m => ({ default: m.AdminCourts })));
-const AdminPricing = lazy(() => import('./pages/admin/AdminPricing').then(m => ({ default: m.AdminPricing })));
 const AdminBlackouts = lazy(() => import('./pages/admin/AdminBlackouts').then(m => ({ default: m.AdminBlackouts })));
 const AdminBookings = lazy(() => import('./pages/admin/AdminBookings').then(m => ({ default: m.AdminBookings })));
 
@@ -76,7 +75,6 @@ function AppShell() {
           <Route element={<AdminRoute><AdminLayout /></AdminRoute>}>
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/courts" element={<AdminCourts />} />
-            <Route path="/admin/pricing" element={<AdminPricing />} />
             <Route path="/admin/blackouts" element={<AdminBlackouts />} />
             <Route path="/admin/bookings" element={<AdminBookings />} />
           </Route>

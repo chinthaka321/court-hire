@@ -64,8 +64,6 @@ export const adminCreateBooking = (data: {
 export const adminCancelBooking = (id: string) => api.delete(`/admin/bookings/${id}`);
 export const adminGetPricing = (courtId: string) =>
   api.get(`/admin/courts/${courtId}/pricing`).then(r => r.data);
-export const adminUpsertPricing = (courtId: string, rates: object[]) =>
-  api.put(`/admin/courts/${courtId}/pricing`, rates);
 export const adminGetBlackouts = (courtId?: string) =>
   api.get('/admin/blackouts', { params: courtId ? { courtId } : {} }).then(r => r.data);
 export const adminCreateBlackout = (data: object) =>

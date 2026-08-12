@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminGetCourts, adminToggleCourt, createCourt, updateCourt, deleteCourt, apiErrorMessage } from '../../lib/api';
-import type { Court } from '../../types';
+import { adminGetCourts, adminToggleCourt, createCourt, updateCourt, deleteCourt, adminGetPricing, apiErrorMessage } from '../../lib/api';
+import type { Court, PriceRate } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input, Field } from '../../components/ui/Input';
+import { Modal } from '../../components/ui/Modal';
+import { RateGridEditor, emptyGrid, gridFromRates, isGridValid, gridToRateRequests, type Grid } from '../../components/admin/RateGrid';
 import { useToast } from '../../components/ui/ToastContext';
 import { Plus, Edit2, AlertCircle } from 'lucide-react';
 
@@ -13,9 +15,10 @@ interface CourtForm {
   close: string;
   slotLengthMinutes: number;
   dayNightBoundary: string;
+  rates: Grid;
 }
 
-const blank: CourtForm = { name: '', open: '07:00', close: '22:00', slotLengthMinutes: 30, dayNightBoundary: '18:00' };
+const blank: CourtForm = { name: '', open: '07:00', close: '22:00', slotLengthMinutes: 30, dayNightBoundary: '18:00', rates: emptyGrid };
 
 export function AdminCourts() {
   const qc = useQueryClient();
@@ -38,7 +41,17 @@ export function AdminCourts() {
   }
 
   const saveMutation = useMutation({
-    mutationFn: () => (editing ? updateCourt(editing, form) : createCourt(form)),
+    mutationFn: () => {
+      const payload = {
+        name: form.name,
+        open: form.open,
+        close: form.close,
+        slotLengthMinutes: form.slotLengthMinutes,
+        dayNightBoundary: form.dayNightBoundary,
+        priceRates: gridToRateRequests(form.rates),
+      };
+      return editing ? updateCourt(editing, payload) : createCourt(payload);
+    },
     onSuccess: () => {
       invalidateCourtDependents();
       showToast(editing ? 'Court updated successfully!' : 'New court registered!', 'success');
@@ -73,6 +86,15 @@ export function AdminCourts() {
     },
   });
 
+  const loadRatesMutation = useMutation({
+    mutationFn: (courtId: string) =>
+      qc.fetchQuery<PriceRate[]>({ queryKey: ['admin-pricing', courtId], queryFn: () => adminGetPricing(courtId) }),
+    onSuccess: (rates) => setForm((f) => ({ ...f, rates: gridFromRates(rates) })),
+    onError: (e: unknown) => {
+      showToast(apiErrorMessage(e, 'Failed to load existing pricing.'), 'error');
+    },
+  });
+
   function editCourt(c: Court) {
     setEditing(c.id);
     setForm({
@@ -81,8 +103,10 @@ export function AdminCourts() {
       close: c.openingHours.close.slice(0, 5),
       slotLengthMinutes: c.slotLengthMinutes,
       dayNightBoundary: c.dayNightBoundary.slice(0, 5),
+      rates: emptyGrid,
     });
     setShowForm(true);
+    loadRatesMutation.mutate(c.id);
   }
 
   function cancelForm() {
@@ -95,7 +119,7 @@ export function AdminCourts() {
   const inactiveCourts = courts.filter((c) => !c.active);
 
   const isTimeInvalid = form.close !== '00:00' && form.close <= form.open;
-  const isFormInvalid = !form.name.trim() || isTimeInvalid;
+  const isFormInvalid = !form.name.trim() || isTimeInvalid || !isGridValid(form.rates);
 
   return (
     <div className="px-4 sm:px-8 py-8 max-w-5xl mx-auto space-y-8">
@@ -121,10 +145,7 @@ export function AdminCourts() {
       </div>
 
       {showForm && (
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-2xl space-y-6">
-          <h2 className="text-xl font-black text-slate-900">
-            {editing ? 'Edit Court Parameters' : 'Register New Court'}
-          </h2>
+        <Modal title={editing ? 'Edit Court Parameters' : 'Register New Court'} onClose={cancelForm}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="sm:col-span-2">
               <Field label="Court Display Name" htmlFor="court-name">
@@ -178,10 +199,23 @@ export function AdminCourts() {
             </p>
           )}
 
+          <div className="pt-2 border-t border-slate-100">
+            <p className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3">Pricing Matrix (Weekday/Weekend x Day/Night)</p>
+            {loadRatesMutation.isPending ? (
+              <div className="grid grid-cols-2 gap-3 animate-pulse">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-20 bg-slate-100 rounded-2xl" />
+                ))}
+              </div>
+            ) : (
+              <RateGridEditor grid={form.rates} onChange={(rates) => setForm((f) => ({ ...f, rates }))} />
+            )}
+          </div>
+
           <div className="flex gap-3 pt-4 border-t border-slate-100">
             <Button
               onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending || isFormInvalid}
+              disabled={saveMutation.isPending || loadRatesMutation.isPending || isFormInvalid}
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               {saveMutation.isPending ? 'Saving...' : 'Save Parameters'}
@@ -190,7 +224,7 @@ export function AdminCourts() {
               Cancel
             </Button>
           </div>
-        </div>
+        </Modal>
       )}
 
       {courts.length === 0 ? (

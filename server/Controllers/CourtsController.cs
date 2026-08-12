@@ -49,8 +49,19 @@ public class CourtsController(AppDbContext db, CourtClock clock) : ControllerBas
         if ((boundaryTooEarly && req.DayNightBoundary != TimeOnly.MinValue) || boundaryTooLate)
             return "Day/night boundary must fall within the opening hours.";
 
+        // A court with any (DayType, Band) combination unpriced silently blacks
+        // out every slot in that band — require exactly the full 2x2 grid, no
+        // fewer, no duplicates (a duplicate would pass an "all required keys
+        // present" check yet still violate the DB's unique index on insert).
+        var distinctCells = req.PriceRates.Select(r => (r.DayType, r.Band)).Distinct().Count();
+        if (req.PriceRates.Count != 4 || distinctCells != 4 || req.PriceRates.Any(r => r.Price < 0))
+            return "All four price grid cells (weekday/weekend x day/night) are required, each >= $0.00.";
+
         return null;
     }
+
+    private static IEnumerable<PriceRate> MapRates(Guid courtId, IEnumerable<UpsertRateRequest> rates) =>
+        rates.Select(r => new PriceRate { Id = Guid.NewGuid(), CourtId = courtId, DayType = r.DayType, Band = r.Band, Price = r.Price });
 
     [HttpPost, Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> Create([FromBody] CreateCourtRequest req)
@@ -70,6 +81,7 @@ public class CourtsController(AppDbContext db, CourtClock clock) : ControllerBas
             Active = true
         };
         db.Courts.Add(court);
+        db.PriceRates.AddRange(MapRates(court.Id, req.PriceRates));
         await db.SaveChangesAsync();
         return Ok(new CourtDto(court.Id, court.Name, court.SlotLengthMinutes, court.OpeningHours, court.DayNightBoundary, court.Active));
     }
@@ -89,6 +101,11 @@ public class CourtsController(AppDbContext db, CourtClock clock) : ControllerBas
         court.OpeningHours = new OpeningHours { Open = req.Open, Close = req.Close };
         court.SlotLengthMinutes = req.SlotLengthMinutes;
         court.DayNightBoundary = req.DayNightBoundary;
+
+        var existingRates = await db.PriceRates.Where(r => r.CourtId == id).ToListAsync();
+        db.PriceRates.RemoveRange(existingRates);
+        db.PriceRates.AddRange(MapRates(id, req.PriceRates));
+
         await db.SaveChangesAsync();
         return Ok(new CourtDto(court.Id, court.Name, court.SlotLengthMinutes, court.OpeningHours, court.DayNightBoundary, court.Active));
     }
@@ -118,4 +135,4 @@ public class CourtsController(AppDbContext db, CourtClock clock) : ControllerBas
     }
 }
 
-public record CreateCourtRequest(string Name, TimeOnly Open, TimeOnly Close, int SlotLengthMinutes, TimeOnly DayNightBoundary);
+public record CreateCourtRequest(string Name, TimeOnly Open, TimeOnly Close, int SlotLengthMinutes, TimeOnly DayNightBoundary, List<UpsertRateRequest> PriceRates);

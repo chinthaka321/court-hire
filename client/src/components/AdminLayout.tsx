@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   CalendarCheck,
   Landmark,
-  BadgeDollarSign,
   Ban,
   ArrowLeft,
   ShieldCheck,
@@ -15,7 +14,6 @@ const NAV = [
   { to: '/admin', label: 'Dashboard', end: true, icon: LayoutDashboard },
   { to: '/admin/bookings', label: 'Bookings', icon: CalendarCheck },
   { to: '/admin/courts', label: 'Courts', icon: Landmark },
-  { to: '/admin/pricing', label: 'Pricing Matrix', icon: BadgeDollarSign },
   { to: '/admin/blackouts', label: 'Blackouts', icon: Ban },
 ];
 

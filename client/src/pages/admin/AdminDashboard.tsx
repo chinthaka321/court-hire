@@ -85,14 +85,8 @@ export function AdminDashboard() {
     {
       to: '/admin/courts',
       label: 'Courts Configuration',
-      desc: 'Set operating hours, slot length & court status',
+      desc: 'Set operating hours, slot length, pricing & court status',
       icon: <Landmark className="w-5 h-5" />,
-    },
-    {
-      to: '/admin/pricing',
-      label: 'Pricing Grid',
-      desc: 'Configure weekday/weekend & day/night rates',
-      icon: <BadgeDollarSign className="w-5 h-5" />,
     },
     {
       to: '/admin/blackouts',
